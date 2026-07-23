@@ -52,6 +52,7 @@ See [RULES.md](./RULES.md) for the complete rules.
 `src/game/engine.test.ts` covers deterministic setup, 2–6 player rosters, phase cadence, contribution spending, exchanges, Trust, signature readiness, invariants, and complete AI playthroughs. The balance simulation requires both victories and defeats at **every** supported player count.
 
 `e2e/walk-v3.mjs` walks a real Chromium browser through setup, briefing, Cabinet, crisis, summit, hotseat privacy, and mobile rendering while failing on browser errors.
+It uses a fixed dispatch code for repeatable runs. Set `SHOTS_DIR` to write its screenshots outside the checked-in `shots/` folder.
 
 ```bash
 # With the dev server running on port 4174
