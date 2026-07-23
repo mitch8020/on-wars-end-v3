@@ -78,6 +78,7 @@ src/
     TreatyWeb.tsx    central relationship board
     ActionDock.tsx   current-phase coordinator
     actions/         isolated controls for each round phase
+    actions/summit/  Accord, Exchange, and Backchannel workspaces
     ...              setup, tracks, dossiers, overlays, and table shell
   session/
     useGameSession.ts  browser game lifecycle, AI turns, and hotseat privacy

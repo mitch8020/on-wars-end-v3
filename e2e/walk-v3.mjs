@@ -40,6 +40,12 @@ await page.getByRole('button', { name: 'Seal commitment' }).click()
 
 await page.getByRole('heading', { name: 'Make one diplomatic move' }).waitFor()
 await page.screenshot({ path: `${shots}05-summit.png`, fullPage: true })
+await page.getByRole('button', { name: 'Exchange' }).click()
+await page.getByRole('button', { name: 'Post proposal' }).waitFor()
+await page.getByRole('button', { name: 'Backchannel' }).click()
+await page.getByRole('button', { name: 'Open backchannel' }).waitFor()
+await page.getByRole('button', { name: 'Accord' }).click()
+await page.getByRole('button', { name: 'Sign the Vellan Accord' }).waitFor()
 
 for (let turn = 0; turn < 50; turn += 1) {
   if (await page.locator('.ending-communique').isVisible()) break
