@@ -64,7 +64,13 @@ node e2e/walk-v3.mjs
 src/
   game/
     data.ts          countries, policy cards, and crises
-    engine.ts        pure setup, reducer, rules checks, and invariants
+    engine.ts        stable public game API
+    setup.ts         deterministic game creation
+    rules.ts         read-only legality and readiness rules
+    reducer.ts       action-driven state transitions
+    state.ts         shared state operations
+    invariants.ts    saved-state and transition integrity checks
+    random.ts        seeded random sequence utilities
     ai.ts            deterministic policy, commitment, and summit choices
     engine.test.ts   rules and complete-game simulation coverage
   components/
