@@ -78,6 +78,9 @@ src/
     ActionDock.tsx   current-phase coordinator
     actions/         isolated controls for each round phase
     ...              setup, tracks, dossiers, overlays, and table shell
+  session/
+    useGameSession.ts  browser game lifecycle, AI turns, and hotseat privacy
+    gameStorage.ts     validated local save adapter
 ```
 
 The UI does not duplicate rule logic. It asks the same engine that powers tests and AI whether actions and signatures are legal.

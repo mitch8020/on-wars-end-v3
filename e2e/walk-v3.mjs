@@ -75,6 +75,23 @@ for (let turn = 0; turn < 50; turn += 1) {
 await page.locator('.ending-communique').waitFor()
 await page.screenshot({ path: `${shots}06-ending.png`, fullPage: true })
 
+const resume = await browser.newPage({ viewport: { width: 1440, height: 950 }, deviceScaleFactor: 1 })
+resume.on('console', (message) => {
+  if (message.type() === 'error') errors.push(`resume console: ${message.text()}`)
+})
+resume.on('pageerror', (error) => errors.push(`resume page: ${error.message}`))
+await resume.goto(baseUrl, { waitUntil: 'networkidle' })
+await resume.evaluate(() => localStorage.clear())
+await resume.reload({ waitUntil: 'networkidle' })
+await resume.locator('.seed-field input').fill('148802')
+await resume.getByRole('button', { name: 'Convene the table' }).click()
+await resume.getByRole('button', { name: 'Open cabinet' }).click()
+await resume.getByRole('heading', { name: 'Choose one national policy' }).waitFor()
+await resume.reload({ waitUntil: 'networkidle' })
+await resume.getByRole('button', { name: 'Resume table' }).click()
+await resume.getByRole('heading', { name: 'Choose one national policy' }).waitFor()
+await resume.close()
+
 const hotseat = await browser.newPage({ viewport: { width: 1440, height: 950 }, deviceScaleFactor: 1 })
 await hotseat.goto(baseUrl, { waitUntil: 'networkidle' })
 await hotseat.evaluate(() => localStorage.clear())
@@ -109,4 +126,4 @@ if (errors.length) {
   console.error(errors.join('\n'))
   process.exit(1)
 }
-console.log('walk-v3: solo flow, hotseat privacy, and mobile layouts passed without browser errors')
+console.log('walk-v3: solo flow, saved resume, hotseat privacy, and mobile layouts passed without browser errors')

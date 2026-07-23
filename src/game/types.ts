@@ -10,6 +10,10 @@ export type GameMode = 'solo' | 'hotseat'
 export type GamePhase = 'briefing' | 'cabinet' | 'crisis' | 'summit' | 'aftermath' | 'ended'
 export type Controller = 'human' | 'ai'
 
+export function isActionPhase(phase: GamePhase): phase is 'cabinet' | 'crisis' | 'summit' {
+  return phase === 'cabinet' || phase === 'crisis' || phase === 'summit'
+}
+
 export type CountryState = {
   id: CountryId
   resources: ResourceBag

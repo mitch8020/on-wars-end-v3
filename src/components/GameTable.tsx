@@ -1,7 +1,7 @@
 import { BookOpen, Clock3, Menu } from 'lucide-react'
 import { useState } from 'react'
 import { COUNTRY_DEFINITIONS } from '../game/data'
-import type { CountryId, GameAction, GameState } from '../game/types'
+import { isActionPhase, type CountryId, type GameAction, type GameState } from '../game/types'
 import { ActionDock } from './ActionDock'
 import { CountryDossier } from './CountryDossier'
 import { CountryStrip } from './CountryStrip'
@@ -27,7 +27,7 @@ const PHASE_LABELS = {
 export function GameTable({ state, lockedFor, onUnlock, onAction, onNewGame }: GameTableProps) {
   const [drawer, setDrawer] = useState<'rules' | 'minutes' | null>(null)
   const [endingReviewed, setEndingReviewed] = useState(false)
-  const actionPhase = state.phase === 'cabinet' || state.phase === 'crisis' || state.phase === 'summit'
+  const actionPhase = isActionPhase(state.phase)
   const viewer = actionPhase ? state.activeCountry : state.humanCountry ?? state.firstPlayer
   const privateView = state.mode === 'hotseat' ? actionPhase : viewer === state.humanCountry
 
