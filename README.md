@@ -75,7 +75,8 @@ src/
     engine.test.ts   rules and complete-game simulation coverage
   components/
     TreatyWeb.tsx    central relationship board
-    ActionDock.tsx   phase-specific decisions
+    ActionDock.tsx   current-phase coordinator
+    actions/         isolated controls for each round phase
     ...              setup, tracks, dossiers, overlays, and table shell
 ```
 
