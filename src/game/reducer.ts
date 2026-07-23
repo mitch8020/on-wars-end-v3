@@ -23,6 +23,8 @@ import {
   type Resource,
 } from './types'
 
+type ActionOf<Type extends GameAction['type']> = Extract<GameAction, { type: Type }>
+
 function nextPendingCountry(
   state: GameState,
   completed: (country: CountryId) => boolean,
@@ -190,218 +192,238 @@ function victoryEnding(state: GameState): GameState['ending'] {
   }
 }
 
+function advanceCabinet(state: GameState): GameState {
+  const following = nextPendingCountry(state, (country) => Boolean(state.countries[country].policyPlayed))
+  if (following) {
+    state.activeCountry = following
+  } else {
+    state.phase = 'crisis'
+    state.activeCountry = state.firstPlayer
+    appendLog(state, 'Cabinet planning ends. Commitments to the shared crisis begin.')
+  }
+  return finalize(state)
+}
+
+function assertSummitTurn(state: GameState, country: CountryId): void {
+  if (state.phase !== 'summit' || state.activeCountry !== country) {
+    throw new Error('It is another country’s summit turn.')
+  }
+}
+
+function acknowledgeBriefing(state: GameState): GameState {
+  if (state.phase !== 'briefing') throw new Error('There is no briefing to acknowledge.')
+  state.phase = 'cabinet'
+  state.activeCountry = state.firstPlayer
+  appendLog(state, `Round ${state.round} cabinet planning begins.`)
+  return finalize(state)
+}
+
+function playPolicy(state: GameState, action: ActionOf<'PLAY_POLICY'>): GameState {
+  const legal = canPlayPolicy(state, action.country, action.cardId, action.target)
+  if (legal !== true) throw new Error(legal)
+  applyPolicy(state, action.country, getPolicy(action.cardId), action.target)
+  return advanceCabinet(state)
+}
+
+function conserveResources(state: GameState, action: ActionOf<'CONSERVE_RESOURCES'>): GameState {
+  if (state.phase !== 'cabinet' || state.activeCountry !== action.country) {
+    throw new Error('It is another country’s cabinet turn.')
+  }
+  state.countries[action.country].resources.capital += 1
+  state.countries[action.country].policyPlayed = 'conserve-resources'
+  appendLog(
+    state,
+    `${COUNTRY_DEFINITIONS[action.country].name} conserves resources and gains 1 Capital.`,
+    action.country,
+  )
+  return advanceCabinet(state)
+}
+
+function submitCommitment(state: GameState, action: ActionOf<'SUBMIT_COMMITMENT'>): GameState {
+  if (state.phase !== 'crisis') throw new Error('The crisis council is not accepting commitments.')
+  if (state.activeCountry !== action.country) throw new Error('It is another country’s commitment window.')
+  if (state.commitments[action.country]) throw new Error('This country has already committed.')
+  const requirements = getCrisis(state.currentCrisisId).requirements(state.playerCount)
+  const clean: Commitment = {}
+  for (const [key, rawAmount] of Object.entries(action.commitment) as [ContributionKey, number][]) {
+    const amount = Math.round(rawAmount)
+    if (!Object.hasOwn(requirements, key)) throw new Error(`${key} is not requested by this crisis.`)
+    if (amount < 0 || amount !== rawAmount) throw new Error('Commitments must be whole, non-negative units.')
+    const available =
+      key === 'military' ? state.countries[action.country].military : state.countries[action.country].resources[key]
+    if (amount > available) throw new Error(`Not enough ${key} to commit.`)
+    if (key === 'military' && available - amount <= 0) {
+      throw new Error('A commitment cannot eliminate the country’s military.')
+    }
+    if (amount > 0) clean[key] = amount
+  }
+  for (const [key, amount] of Object.entries(clean) as [ContributionKey, number][]) {
+    if (key === 'military') state.countries[action.country].military -= amount
+    else state.countries[action.country].resources[key] -= amount
+  }
+  state.commitments[action.country] = clean
+  appendLog(state, `${COUNTRY_DEFINITIONS[action.country].name} seals its crisis commitment.`, action.country)
+  const following = nextPendingCountry(state, (country) => Boolean(state.commitments[country]))
+  if (following) {
+    state.activeCountry = following
+  } else {
+    resolveCrisis(state)
+    state.phase = 'summit'
+    state.activeCountry = state.firstPlayer
+    appendLog(state, 'The crisis resolves. The peace summit opens.')
+  }
+  return finalize(state)
+}
+
+function postOffer(state: GameState, action: ActionOf<'POST_OFFER'>): GameState {
+  assertSummitTurn(state, action.country)
+  if (action.give === action.want) throw new Error('An exchange must name two different resources.')
+  if (state.countries[action.country].resources[action.give] < 1) {
+    throw new Error(`No ${action.give} is available to offer.`)
+  }
+  state.summitOffers[action.country] = {
+    country: action.country,
+    give: action.give,
+    want: action.want,
+  }
+  appendLog(
+    state,
+    `${COUNTRY_DEFINITIONS[action.country].name} posts a ${action.give}-for-${action.want} proposal.`,
+    action.country,
+  )
+  markSummitTurnAndAdvance(state, action.country)
+  return finalize(state)
+}
+
+function acceptOffer(state: GameState, action: ActionOf<'ACCEPT_OFFER'>): GameState {
+  assertSummitTurn(state, action.country)
+  const offer = state.summitOffers[action.offerCountry]
+  if (!offer || offer.country === action.country) throw new Error('That proposal is not available.')
+  if (state.countries[offer.country].resources[offer.give] < 1) {
+    throw new Error('The proposer can no longer honor that proposal.')
+  }
+  if (state.countries[action.country].resources[offer.want] < 1) {
+    throw new Error(`You need 1 ${offer.want} to accept.`)
+  }
+  transferOne(state, offer.country, action.country, offer.give)
+  transferOne(state, action.country, offer.country, offer.want)
+  changeTrust(state, action.country, offer.country, 1)
+  state.peaceMomentum = clamp(state.peaceMomentum + 1)
+  delete state.summitOffers[action.offerCountry]
+  appendLog(
+    state,
+    `${COUNTRY_DEFINITIONS[action.country].name} accepts ${COUNTRY_DEFINITIONS[offer.country].name}’s exchange.`,
+    action.country,
+  )
+  markSummitTurnAndAdvance(state, action.country)
+  return finalize(state)
+}
+
+function buildTrust(state: GameState, action: ActionOf<'BUILD_TRUST'>): GameState {
+  assertSummitTurn(state, action.country)
+  if (action.target === action.country || !state.countryOrder.includes(action.target)) {
+    throw new Error('Choose another country.')
+  }
+  if (state.countries[action.country].resources.capital < 1) {
+    throw new Error('A backchannel costs 1 Capital.')
+  }
+  state.countries[action.country].resources.capital -= 1
+  changeTrust(state, action.country, action.target, 2)
+  state.countries[action.target].mandateRevealed = true
+  state.peaceMomentum = clamp(state.peaceMomentum + 1)
+  appendLog(
+    state,
+    `${COUNTRY_DEFINITIONS[action.country].name} opens a backchannel with ${COUNTRY_DEFINITIONS[action.target].name}.`,
+    action.country,
+  )
+  markSummitTurnAndAdvance(state, action.country)
+  return finalize(state)
+}
+
+function signTreaty(state: GameState, action: ActionOf<'SIGN_TREATY'>): GameState {
+  assertSummitTurn(state, action.country)
+  const status = getSigningStatus(state, action.country)
+  if (!status.eligible) throw new Error(status.reasons.join(' '))
+  state.countries[action.country].signed = true
+  state.peaceMomentum = clamp(state.peaceMomentum + 1)
+  appendLog(state, `${COUNTRY_DEFINITIONS[action.country].name} signs the Vellan Accord.`, action.country)
+  if (allSigned(state)) {
+    state.ending = victoryEnding(state)
+    state.phase = 'ended'
+  } else {
+    markSummitTurnAndAdvance(state, action.country)
+  }
+  return finalize(state)
+}
+
+function passSummit(state: GameState, action: ActionOf<'PASS_SUMMIT'>): GameState {
+  assertSummitTurn(state, action.country)
+  appendLog(
+    state,
+    `${COUNTRY_DEFINITIONS[action.country].name} closes its summit window without an agreement.`,
+    action.country,
+  )
+  markSummitTurnAndAdvance(state, action.country)
+  return finalize(state)
+}
+
+function continueRound(state: GameState): GameState {
+  if (state.phase !== 'aftermath') throw new Error('The round is not ready to close.')
+  if (state.round >= state.maxRounds) {
+    const unsigned = state.countryOrder.filter((country) => !state.countries[country].signed)
+    state.ending = {
+      result: 'defeat',
+      title: 'Peace arrives one round too late',
+      reason: `${unsigned.map((country) => COUNTRY_DEFINITIONS[country].name).join(', ')} did not sign by the end of Round ${state.maxRounds}.`,
+      epilogue:
+        'By morning, every delegation can describe the agreement they should have made. The front does not wait for hindsight.',
+    }
+    state.phase = 'ended'
+    return finalize(state)
+  }
+  const formerFirst = state.countryOrder.indexOf(state.firstPlayer)
+  state.firstPlayer = state.countryOrder[(formerFirst + 1) % state.countryOrder.length]
+  state.activeCountry = state.firstPlayer
+  state.round += 1
+  state.phase = 'briefing'
+  state.currentCrisisId = state.crisisDeck[0]
+  state.crisisDeck = state.crisisDeck.slice(1)
+  state.commitments = {}
+  state.summitOffers = {}
+  state.summitTurnsTaken = {}
+  state.lastCrisisResult = null
+  dealPolicyHands(state)
+  appendLog(
+    state,
+    `Round ${state.round} begins. ${COUNTRY_DEFINITIONS[state.firstPlayer].name} now holds the chair.`,
+  )
+  return finalize(state)
+}
+
 export function reduceGame(state: GameState, action: GameAction): GameState {
   if (state.ending) throw new Error('The game has already ended.')
   const next = cloneGameState(state)
 
   switch (action.type) {
-    case 'ACKNOWLEDGE_BRIEFING': {
-      if (next.phase !== 'briefing') throw new Error('There is no briefing to acknowledge.')
-      next.phase = 'cabinet'
-      next.activeCountry = next.firstPlayer
-      appendLog(next, `Round ${next.round} cabinet planning begins.`)
-      return finalize(next)
-    }
-    case 'PLAY_POLICY': {
-      const legal = canPlayPolicy(next, action.country, action.cardId, action.target)
-      if (legal !== true) throw new Error(legal)
-      applyPolicy(next, action.country, getPolicy(action.cardId), action.target)
-      const following = nextPendingCountry(next, (country) => Boolean(next.countries[country].policyPlayed))
-      if (following) {
-        next.activeCountry = following
-      } else {
-        next.phase = 'crisis'
-        next.activeCountry = next.firstPlayer
-        appendLog(next, 'Cabinet planning ends. Commitments to the shared crisis begin.')
-      }
-      return finalize(next)
-    }
-    case 'CONSERVE_RESOURCES': {
-      if (next.phase !== 'cabinet' || next.activeCountry !== action.country) {
-        throw new Error('It is another country’s cabinet turn.')
-      }
-      next.countries[action.country].resources.capital += 1
-      next.countries[action.country].policyPlayed = 'conserve-resources'
-      appendLog(
-        next,
-        `${COUNTRY_DEFINITIONS[action.country].name} conserves resources and gains 1 Capital.`,
-        action.country,
-      )
-      const following = nextPendingCountry(next, (country) => Boolean(next.countries[country].policyPlayed))
-      if (following) {
-        next.activeCountry = following
-      } else {
-        next.phase = 'crisis'
-        next.activeCountry = next.firstPlayer
-        appendLog(next, 'Cabinet planning ends. Commitments to the shared crisis begin.')
-      }
-      return finalize(next)
-    }
-    case 'SUBMIT_COMMITMENT': {
-      if (next.phase !== 'crisis') throw new Error('The crisis council is not accepting commitments.')
-      if (next.activeCountry !== action.country) throw new Error('It is another country’s commitment window.')
-      if (next.commitments[action.country]) throw new Error('This country has already committed.')
-      const requirements = getCrisis(next.currentCrisisId).requirements(next.playerCount)
-      const clean: Commitment = {}
-      for (const [key, rawAmount] of Object.entries(action.commitment) as [ContributionKey, number][]) {
-        const amount = Math.round(rawAmount)
-        if (!Object.hasOwn(requirements, key)) throw new Error(`${key} is not requested by this crisis.`)
-        if (amount < 0 || amount !== rawAmount) throw new Error('Commitments must be whole, non-negative units.')
-        const available =
-          key === 'military'
-            ? next.countries[action.country].military
-            : next.countries[action.country].resources[key]
-        if (amount > available) throw new Error(`Not enough ${key} to commit.`)
-        if (key === 'military' && available - amount <= 0) {
-          throw new Error('A commitment cannot eliminate the country’s military.')
-        }
-        if (amount > 0) clean[key] = amount
-      }
-      for (const [key, amount] of Object.entries(clean) as [ContributionKey, number][]) {
-        if (key === 'military') next.countries[action.country].military -= amount
-        else next.countries[action.country].resources[key] -= amount
-      }
-      next.commitments[action.country] = clean
-      appendLog(next, `${COUNTRY_DEFINITIONS[action.country].name} seals its crisis commitment.`, action.country)
-      const following = nextPendingCountry(next, (country) => Boolean(next.commitments[country]))
-      if (following) {
-        next.activeCountry = following
-      } else {
-        resolveCrisis(next)
-        next.phase = 'summit'
-        next.activeCountry = next.firstPlayer
-        appendLog(next, 'The crisis resolves. The peace summit opens.')
-      }
-      return finalize(next)
-    }
-    case 'POST_OFFER': {
-      if (next.phase !== 'summit' || next.activeCountry !== action.country) {
-        throw new Error('It is another country’s summit turn.')
-      }
-      if (action.give === action.want) throw new Error('An exchange must name two different resources.')
-      if (next.countries[action.country].resources[action.give] < 1) {
-        throw new Error(`No ${action.give} is available to offer.`)
-      }
-      next.summitOffers[action.country] = {
-        country: action.country,
-        give: action.give,
-        want: action.want,
-      }
-      appendLog(
-        next,
-        `${COUNTRY_DEFINITIONS[action.country].name} posts a ${action.give}-for-${action.want} proposal.`,
-        action.country,
-      )
-      markSummitTurnAndAdvance(next, action.country)
-      return finalize(next)
-    }
-    case 'ACCEPT_OFFER': {
-      if (next.phase !== 'summit' || next.activeCountry !== action.country) {
-        throw new Error('It is another country’s summit turn.')
-      }
-      const offer = next.summitOffers[action.offerCountry]
-      if (!offer || offer.country === action.country) throw new Error('That proposal is not available.')
-      if (next.countries[offer.country].resources[offer.give] < 1) {
-        throw new Error('The proposer can no longer honor that proposal.')
-      }
-      if (next.countries[action.country].resources[offer.want] < 1) {
-        throw new Error(`You need 1 ${offer.want} to accept.`)
-      }
-      transferOne(next, offer.country, action.country, offer.give)
-      transferOne(next, action.country, offer.country, offer.want)
-      changeTrust(next, action.country, offer.country, 1)
-      next.peaceMomentum = clamp(next.peaceMomentum + 1)
-      delete next.summitOffers[action.offerCountry]
-      appendLog(
-        next,
-        `${COUNTRY_DEFINITIONS[action.country].name} accepts ${COUNTRY_DEFINITIONS[offer.country].name}’s exchange.`,
-        action.country,
-      )
-      markSummitTurnAndAdvance(next, action.country)
-      return finalize(next)
-    }
-    case 'BUILD_TRUST': {
-      if (next.phase !== 'summit' || next.activeCountry !== action.country) {
-        throw new Error('It is another country’s summit turn.')
-      }
-      if (action.target === action.country || !next.countryOrder.includes(action.target)) {
-        throw new Error('Choose another country.')
-      }
-      if (next.countries[action.country].resources.capital < 1) {
-        throw new Error('A backchannel costs 1 Capital.')
-      }
-      next.countries[action.country].resources.capital -= 1
-      changeTrust(next, action.country, action.target, 2)
-      next.countries[action.target].mandateRevealed = true
-      next.peaceMomentum = clamp(next.peaceMomentum + 1)
-      appendLog(
-        next,
-        `${COUNTRY_DEFINITIONS[action.country].name} opens a backchannel with ${COUNTRY_DEFINITIONS[action.target].name}.`,
-        action.country,
-      )
-      markSummitTurnAndAdvance(next, action.country)
-      return finalize(next)
-    }
-    case 'SIGN_TREATY': {
-      if (next.phase !== 'summit' || next.activeCountry !== action.country) {
-        throw new Error('It is another country’s summit turn.')
-      }
-      const status = getSigningStatus(next, action.country)
-      if (!status.eligible) throw new Error(status.reasons.join(' '))
-      next.countries[action.country].signed = true
-      next.peaceMomentum = clamp(next.peaceMomentum + 1)
-      appendLog(next, `${COUNTRY_DEFINITIONS[action.country].name} signs the Vellan Accord.`, action.country)
-      if (allSigned(next)) {
-        next.ending = victoryEnding(next)
-        next.phase = 'ended'
-      } else {
-        markSummitTurnAndAdvance(next, action.country)
-      }
-      return finalize(next)
-    }
-    case 'PASS_SUMMIT': {
-      if (next.phase !== 'summit' || next.activeCountry !== action.country) {
-        throw new Error('It is another country’s summit turn.')
-      }
-      appendLog(
-        next,
-        `${COUNTRY_DEFINITIONS[action.country].name} closes its summit window without an agreement.`,
-        action.country,
-      )
-      markSummitTurnAndAdvance(next, action.country)
-      return finalize(next)
-    }
-    case 'CONTINUE_ROUND': {
-      if (next.phase !== 'aftermath') throw new Error('The round is not ready to close.')
-      if (next.round >= next.maxRounds) {
-        const unsigned = next.countryOrder.filter((country) => !next.countries[country].signed)
-        next.ending = {
-          result: 'defeat',
-          title: 'Peace arrives one round too late',
-          reason: `${unsigned.map((country) => COUNTRY_DEFINITIONS[country].name).join(', ')} did not sign by the end of Round ${next.maxRounds}.`,
-          epilogue:
-            'By morning, every delegation can describe the agreement they should have made. The front does not wait for hindsight.',
-        }
-        next.phase = 'ended'
-        return finalize(next)
-      }
-      const formerFirst = next.countryOrder.indexOf(next.firstPlayer)
-      next.firstPlayer = next.countryOrder[(formerFirst + 1) % next.countryOrder.length]
-      next.activeCountry = next.firstPlayer
-      next.round += 1
-      next.phase = 'briefing'
-      next.currentCrisisId = next.crisisDeck[0]
-      next.crisisDeck = next.crisisDeck.slice(1)
-      next.commitments = {}
-      next.summitOffers = {}
-      next.summitTurnsTaken = {}
-      next.lastCrisisResult = null
-      dealPolicyHands(next)
-      appendLog(
-        next,
-        `Round ${next.round} begins. ${COUNTRY_DEFINITIONS[next.firstPlayer].name} now holds the chair.`,
-      )
-      return finalize(next)
-    }
+    case 'ACKNOWLEDGE_BRIEFING':
+      return acknowledgeBriefing(next)
+    case 'PLAY_POLICY':
+      return playPolicy(next, action)
+    case 'CONSERVE_RESOURCES':
+      return conserveResources(next, action)
+    case 'SUBMIT_COMMITMENT':
+      return submitCommitment(next, action)
+    case 'POST_OFFER':
+      return postOffer(next, action)
+    case 'ACCEPT_OFFER':
+      return acceptOffer(next, action)
+    case 'BUILD_TRUST':
+      return buildTrust(next, action)
+    case 'SIGN_TREATY':
+      return signTreaty(next, action)
+    case 'PASS_SUMMIT':
+      return passSummit(next, action)
+    case 'CONTINUE_ROUND':
+      return continueRound(next)
   }
 }
