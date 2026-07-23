@@ -63,7 +63,8 @@ node e2e/walk-v3.mjs
 ```text
 src/
   game/
-    data.ts          countries, policy cards, and crises
+    data.ts          stable public content API
+    catalog/         countries, policies, crises, resources, and tracks
     engine.ts        stable public game API
     setup.ts         deterministic game creation
     rules.ts         read-only legality and readiness rules
