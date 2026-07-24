@@ -8,7 +8,7 @@ The table has six rounds to survive regional crises, build credible relationship
 
 ```bash
 npm install
-npm run dev        # http://localhost:4174
+npm run dev        # http://localhost:30073
 npm test           # deterministic engine and balance simulations
 npm run lint
 npm run build
@@ -55,7 +55,7 @@ See [RULES.md](./RULES.md) for the complete rules.
 It uses a fixed dispatch code for repeatable runs. Set `SHOTS_DIR` to write its screenshots outside the checked-in `shots/` folder.
 
 ```bash
-# With the dev server running on port 4174
+# With the dev server running on port 30073
 node e2e/walk-v3.mjs
 ```
 

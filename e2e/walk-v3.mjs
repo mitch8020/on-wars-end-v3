@@ -3,7 +3,7 @@ import { mkdir } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const baseUrl = process.env.BASE_URL || 'http://127.0.0.1:4174'
+const baseUrl = process.env.BASE_URL || 'http://127.0.0.1:30073'
 const shots = resolve(process.env.SHOTS_DIR || fileURLToPath(new URL('../shots/', import.meta.url)))
 await mkdir(shots, { recursive: true })
 
