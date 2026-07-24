@@ -1,4 +1,5 @@
 import { chromium } from '@playwright/test'
+import assert from 'node:assert/strict'
 import { mkdir } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -25,6 +26,29 @@ async function resetSetup(page, seed = 148802) {
   await page.reload({ waitUntil: 'networkidle' })
   await page.locator('.seed-field input').fill(String(seed))
 }
+
+async function revealHotseat(page) {
+  const ready = page.getByRole('button', { name: /^I am / })
+  await ready.waitFor()
+  await ready.click()
+}
+
+const recovery = await checkedPage('recovery', {
+  viewport: { width: 1280, height: 900 },
+  deviceScaleFactor: 1,
+})
+await recovery.goto(baseUrl, { waitUntil: 'networkidle' })
+await recovery.evaluate(() => {
+  localStorage.setItem('on-wars-end-v3-save', '{"version":"corrupt"}')
+})
+await recovery.reload({ waitUntil: 'networkidle' })
+await recovery.getByRole('heading', { name: 'Convene the peace table' }).waitFor()
+assert.equal(await recovery.getByRole('button', { name: 'Resume table' }).count(), 0)
+assert.equal(
+  await recovery.evaluate(() => localStorage.getItem('on-wars-end-v3-save')),
+  null,
+)
+await recovery.close()
 
 const page = await checkedPage('solo', {
   viewport: { width: 1600, height: 1050 },
@@ -114,6 +138,12 @@ await resume.getByRole('heading', { name: 'Choose one national policy' }).waitFo
 await resume.reload({ waitUntil: 'networkidle' })
 await resume.getByRole('button', { name: 'Resume table' }).click()
 await resume.getByRole('heading', { name: 'Choose one national policy' }).waitFor()
+resume.once('dialog', (dialog) => dialog.dismiss())
+await resume.getByRole('button', { name: 'New table' }).click()
+await resume.getByRole('heading', { name: 'Choose one national policy' }).waitFor()
+resume.once('dialog', (dialog) => dialog.accept())
+await resume.getByRole('button', { name: 'New table' }).click()
+await resume.getByRole('heading', { name: 'Convene the peace table' }).waitFor()
 await resume.close()
 
 const hotseat = await checkedPage('hotseat', {
@@ -121,20 +151,84 @@ const hotseat = await checkedPage('hotseat', {
   deviceScaleFactor: 1,
 })
 await resetSetup(hotseat)
+await hotseat.getByRole('button', { name: '2', exact: true }).click()
 await hotseat.getByRole('button', { name: /Pass & play/ }).click()
 await hotseat.getByRole('button', { name: 'Convene the table' }).click()
 await hotseat.getByRole('button', { name: 'Open cabinet' }).click()
 await hotseat.getByRole('heading', { name: /Pass the table to/ }).waitFor()
 await hotseat.screenshot({ path: join(shots, '07-hotseat-curtain.png'), fullPage: true })
-await hotseat.getByRole('button', { name: /^I am / }).click()
-const hotseatAction = hotseat.locator('.cabinet-actions .action-button')
-if (await hotseatAction.isDisabled()) {
-  const partner = hotseat.locator('.target-picker button').first()
-  if (await partner.count()) await partner.click()
-}
-if (await hotseatAction.isEnabled()) await hotseatAction.click()
-else await hotseat.getByRole('button', { name: /Conserve instead/ }).click()
-await hotseat.getByRole('heading', { name: /Pass the table to/ }).waitFor()
+await revealHotseat(hotseat)
+await hotseat.getByRole('button', { name: /Conserve instead/ }).click()
+await revealHotseat(hotseat)
+await hotseat.getByRole('button', { name: /Conserve instead/ }).click()
+
+await revealHotseat(hotseat)
+await hotseat.getByRole('heading', { name: 'Seal your commitment' }).waitFor()
+await hotseat.getByRole('button', { name: 'Seal commitment' }).click()
+await revealHotseat(hotseat)
+await hotseat.getByRole('button', { name: 'Seal commitment' }).click()
+
+await revealHotseat(hotseat)
+await hotseat.getByRole('heading', { name: 'Make one diplomatic move' }).waitFor()
+const trade = await hotseat.evaluate(() => {
+  const state = JSON.parse(localStorage.getItem('on-wars-end-v3-save'))
+  const resources = ['food', 'industry', 'fuel', 'capital']
+  const proposer = state.activeCountry
+  const recipient = state.countryOrder.find((country) => country !== proposer)
+  const give = resources.find((resource) => state.countries[proposer].resources[resource] > 0)
+  const want = resources.find(
+    (resource) =>
+      resource !== give && state.countries[recipient].resources[resource] > 0,
+  )
+  if (!give || !want) return null
+  const trustKey = [proposer, recipient].sort().join(':')
+  return {
+    proposer,
+    recipient,
+    give,
+    want,
+    proposerGive: state.countries[proposer].resources[give],
+    proposerWant: state.countries[proposer].resources[want],
+    recipientGive: state.countries[recipient].resources[give],
+    recipientWant: state.countries[recipient].resources[want],
+    trustKey,
+    trust: state.trust[trustKey],
+  }
+})
+assert.ok(trade, 'Expected the deterministic hotseat state to support an exchange.')
+await hotseat.getByRole('button', { name: 'Exchange' }).click()
+await hotseat.getByLabel('You give').selectOption(trade.give)
+await hotseat.getByLabel('You request').selectOption(trade.want)
+await hotseat.getByRole('button', { name: 'Post proposal' }).click()
+await revealHotseat(hotseat)
+const proposal = hotseat.locator('.proposal-list button')
+await proposal.waitFor()
+assert.equal(await proposal.isEnabled(), true)
+await proposal.click()
+await hotseat.locator('.round-aftermath').waitFor()
+await hotseat.waitForFunction(
+  () => JSON.parse(localStorage.getItem('on-wars-end-v3-save')).phase === 'aftermath',
+)
+const tradedState = await hotseat.evaluate(() =>
+  JSON.parse(localStorage.getItem('on-wars-end-v3-save')),
+)
+assert.equal(
+  tradedState.countries[trade.proposer].resources[trade.give],
+  trade.proposerGive - 1,
+)
+assert.equal(
+  tradedState.countries[trade.proposer].resources[trade.want],
+  trade.proposerWant + 1,
+)
+assert.equal(
+  tradedState.countries[trade.recipient].resources[trade.give],
+  trade.recipientGive + 1,
+)
+assert.equal(
+  tradedState.countries[trade.recipient].resources[trade.want],
+  trade.recipientWant - 1,
+)
+assert.equal(tradedState.trust[trade.trustKey], Math.min(4, trade.trust + 1))
 
 const mobile = await checkedPage('mobile', {
   viewport: { width: 390, height: 844 },

@@ -9,7 +9,8 @@ The table has six rounds to survive regional crises, build credible relationship
 ```bash
 npm install
 npm run dev        # http://localhost:30073
-npm test           # deterministic engine and balance simulations
+npm test           # unit, session, and component tests
+npm run test:coverage
 npm run lint
 npm run build
 ```
@@ -49,9 +50,9 @@ See [RULES.md](./RULES.md) for the complete rules.
 
 ## Verification
 
-`src/game/engine.test.ts` covers deterministic setup, 2–6 player rosters, phase cadence, contribution spending, exchanges, Trust, signature readiness, invariants, and complete AI playthroughs. The balance simulation requires both victories and defeats at **every** supported player count.
+The Vitest suite covers the game engine, deterministic setup, 2–6 player rosters, phase cadence, contribution spending, exchanges, Trust, signature readiness, invariants, complete AI playthroughs, browser session lifecycle, and React interactions. `npm run test:coverage` enforces 100% statements, branches, functions, and lines.
 
-`e2e/walk-v3.mjs` walks a real Chromium browser through setup, briefing, Cabinet, crisis, summit, hotseat privacy, and mobile rendering while failing on browser errors.
+`e2e/walk-v3.mjs` walks a real Chromium browser through corrupt-save recovery, setup, briefing, Cabinet, crisis, summit, saved resume, new-table confirmation, a complete hotseat exchange, privacy handoffs, and mobile rendering while failing on browser errors or incorrect resource/Trust transfers.
 It uses a fixed dispatch code for repeatable runs. Set `SHOTS_DIR` to write its screenshots outside the checked-in `shots/` folder.
 
 ```bash

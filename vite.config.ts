@@ -12,6 +12,12 @@ export default defineConfig({
       exclude: ['src/**/*.test.{ts,tsx}', 'src/test/**'],
       reporter: ['text', 'json-summary', 'html'],
       reportOnFailure: true,
+      thresholds: {
+        statements: 100,
+        branches: 100,
+        functions: 100,
+        lines: 100,
+      },
     },
   },
 })
