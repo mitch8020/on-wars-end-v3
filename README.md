@@ -70,6 +70,7 @@ src/
     setup.ts         deterministic game creation
     rules.ts         read-only legality and readiness rules
     reducer.ts       action-driven state transitions
+    transitions/     phase actions, crisis resolution, and round lifecycle
     state.ts         shared state operations
     invariants.ts    saved-state and transition integrity checks
     random.ts        seeded random sequence utilities
