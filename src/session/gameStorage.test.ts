@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { setupGame } from '../game/engine'
-import { SAVE_KEY, readSavedGame, writeSavedGame, type GameStorage } from './gameStorage'
+import {
+  SAVE_KEY,
+  clearSavedGame,
+  readSavedGame,
+  writeSavedGame,
+  type GameStorage,
+} from './gameStorage'
 
 function memoryStorage(): GameStorage {
   const values = new Map<string, string>()
@@ -26,6 +32,14 @@ describe('game storage', () => {
     storage.setItem(SAVE_KEY, '{"version":"broken"}')
 
     expect(readSavedGame(storage)).toBeNull()
+    expect(storage.getItem(SAVE_KEY)).toBeNull()
+  })
+
+  it('returns null for an empty store and clears an existing save', () => {
+    const storage = memoryStorage()
+    expect(readSavedGame(storage)).toBeNull()
+    storage.setItem(SAVE_KEY, 'saved')
+    clearSavedGame(storage)
     expect(storage.getItem(SAVE_KEY)).toBeNull()
   })
 })

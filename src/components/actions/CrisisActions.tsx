@@ -33,7 +33,7 @@ export function CrisisActions({ state, onAction }: PhaseActionsProps) {
     setCommitment(next)
   }
 
-  const units = Object.values(commitment).reduce((sum, amount) => sum + (amount ?? 0), 0)
+  const units = Object.values(commitment).reduce((sum, amount) => sum + amount, 0)
   return (
     <div className="action-layout crisis-actions">
       <div className="action-intro">

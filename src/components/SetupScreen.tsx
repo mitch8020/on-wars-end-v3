@@ -128,7 +128,7 @@ export function SetupScreen({ onStart, hasSavedGame, onResume }: SetupScreenProp
             <button
               type="button"
               className="button-primary button-convene"
-              onClick={() => onStart({ playerCount, mode, humanCountry: roster.includes(humanCountry) ? humanCountry : roster[0], seed })}
+              onClick={() => onStart({ playerCount, mode, humanCountry, seed })}
             >
               <Handshake aria-hidden="true" /> Convene the table
             </button>
