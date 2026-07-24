@@ -74,7 +74,8 @@ src/
     state.ts         shared state operations
     invariants.ts    saved-state and transition integrity checks
     random.ts        seeded random sequence utilities
-    ai.ts            deterministic policy, commitment, and summit choices
+    ai.ts            stable public AI API
+    ai/              phase strategies, scoring, reserves, and turn execution
     engine.test.ts   rules and complete-game simulation coverage
   components/
     TreatyWeb.tsx    central relationship board
