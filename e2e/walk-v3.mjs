@@ -35,6 +35,12 @@ await page.screenshot({ path: join(shots, '01-setup.png'), fullPage: true })
 
 await page.getByRole('button', { name: 'Convene the table' }).click()
 await page.getByRole('button', { name: 'Open cabinet' }).waitFor()
+await page.getByRole('button', { name: 'Guide' }).click()
+const drawer = page.locator('.table-drawer')
+await drawer.getByRole('heading', { name: 'How peace is made' }).waitFor()
+await drawer.getByRole('button', { name: 'Minutes' }).click()
+await drawer.getByRole('heading', { name: 'Conference minutes' }).waitFor()
+await drawer.getByRole('button', { name: 'Close drawer' }).click()
 await page.screenshot({ path: join(shots, '02-briefing.png'), fullPage: true })
 
 await page.getByRole('button', { name: 'Open cabinet' }).click()

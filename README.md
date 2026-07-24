@@ -82,6 +82,8 @@ src/
     ActionDock.tsx   current-phase coordinator
     actions/         isolated controls for each round phase
     actions/summit/  Accord, Exchange, and Backchannel workspaces
+    Overlays.tsx     stable public overlay API
+    overlays/        reference drawer, pass curtain, and final communiqué
     ...              setup, tracks, dossiers, overlays, and table shell
   session/
     useGameSession.ts  browser game lifecycle, AI turns, and hotseat privacy
