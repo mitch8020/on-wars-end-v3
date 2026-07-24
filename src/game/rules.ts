@@ -84,17 +84,19 @@ export function canPlayPolicy(state: GameState, country: CountryId, cardId: stri
   const current = state.countries[country]
   if (!current.policyHand.includes(cardId)) return 'That policy is not in this cabinet hand.'
   const policy = getPolicy(cardId)
+  const militaryDelta = policy.militaryDelta ?? 0
+  const targetMilitaryDelta = policy.targetMilitaryDelta ?? 0
   if (!hasResources(current, policy.cost ?? {})) return 'The policy cost cannot be paid.'
   if (policy.requiresTarget && (!target || target === country || !state.countryOrder.includes(target))) {
     return 'Choose another country.'
   }
-  if ((policy.militaryDelta ?? 0) < 0 && current.military + (policy.militaryDelta ?? 0) <= 0) {
+  if (militaryDelta < 0 && current.military + militaryDelta <= 0) {
     return 'This would leave the country without a military.'
   }
   if (
     target &&
-    (policy.targetMilitaryDelta ?? 0) < 0 &&
-    state.countries[target].military + (policy.targetMilitaryDelta ?? 0) <= 0
+    targetMilitaryDelta < 0 &&
+    state.countries[target].military + targetMilitaryDelta <= 0
   ) {
     return 'This would leave the partner without a military.'
   }

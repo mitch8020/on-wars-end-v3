@@ -5,8 +5,8 @@ import type { Commitment, ContributionKey, GameState } from '../types'
 import { finalizeTransition, nextPendingCountry } from './lifecycle'
 import type { ActionOf } from './types'
 
-function contributionUnits(commitment: Commitment | undefined): number {
-  return Object.values(commitment ?? {}).reduce((sum, value) => sum + (value ?? 0), 0)
+function contributionUnits(commitment: Commitment): number {
+  return Object.values(commitment).reduce((sum, value) => sum + value, 0)
 }
 
 function resolveCrisis(state: GameState): void {
@@ -14,7 +14,7 @@ function resolveCrisis(state: GameState): void {
   const requirements = crisis.requirements(state.playerCount)
   const totals = getContributionTotals(state)
   const succeeded = Object.entries(requirements).every(
-    ([key, requirement]) => (totals[key as ContributionKey] ?? 0) >= (requirement ?? 0),
+    ([key, requirement]) => (totals[key as ContributionKey] ?? 0) >= requirement,
   )
   const result = succeeded ? crisis.success : crisis.failure
 
@@ -36,8 +36,8 @@ function resolveCrisis(state: GameState): void {
     for (let second = first + 1; second < state.countryOrder.length; second += 1) {
       const firstCountry = state.countryOrder[first]
       const secondCountry = state.countryOrder[second]
-      const firstUnits = contributionUnits(state.commitments[firstCountry])
-      const secondUnits = contributionUnits(state.commitments[secondCountry])
+      const firstUnits = contributionUnits(state.commitments[firstCountry]!)
+      const secondUnits = contributionUnits(state.commitments[secondCountry]!)
       if (firstUnits >= responsibleAt && secondUnits >= responsibleAt) {
         changeTrust(state, firstCountry, secondCountry, 1)
       } else if ((firstUnits === 0) !== (secondUnits === 0)) {
