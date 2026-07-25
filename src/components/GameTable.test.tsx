@@ -7,6 +7,7 @@ import { GameTable } from './GameTable'
 
 afterEach(() => {
   vi.restoreAllMocks()
+  localStorage.clear()
 })
 
 describe('GameTable', () => {
@@ -139,5 +140,94 @@ describe('GameTable', () => {
       />,
     )
     expect(screen.getByRole('heading', { name: /Aravell|Tomerin/ })).toBeInTheDocument()
+  })
+
+  it('opens responsive folios, changes the viewed delegation, and toggles sound', () => {
+    localStorage.setItem('on-wars-end-v3:table-audio', 'on')
+    const state = testGame(2)
+    state.phase = 'cabinet'
+    state.humanCountry = 'aravell'
+    const { rerender } = render(
+      <GameTable
+        state={state}
+        lockedFor={null}
+        onUnlock={vi.fn()}
+        onAction={vi.fn()}
+        onNewGame={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Crisis dispatch' }))
+    expect(screen.getByRole('button', { name: 'Close crisis folio' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Close crisis folio' }))
+    fireEvent.click(screen.getByRole('button', { name: /Aravell folio/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Close delegation folio' }))
+    fireEvent.click(screen.getByRole('button', { name: /Aravell folio/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Close table folio' }))
+
+    fireEvent.click(screen.getByRole('button', { name: /View Tomerin/ }))
+    expect(screen.getByRole('heading', { name: 'Tomerin' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Tomerin folio/ })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Mute table sounds' }))
+    expect(screen.getByRole('button', { name: 'Enable table sounds' })).toBeInTheDocument()
+
+    state.activeCountry = 'tomerin'
+    rerender(
+      <GameTable
+        state={state}
+        lockedFor={null}
+        onUnlock={vi.fn()}
+        onAction={vi.fn()}
+        onNewGame={vi.fn()}
+      />,
+    )
+    expect(screen.getByRole('heading', { name: 'Tomerin' })).toBeInTheDocument()
+  })
+
+  it('replaces phase controls with an announced, skippable envoy turn', () => {
+    const state = testGame(2)
+    state.phase = 'cabinet'
+    const skip = vi.fn()
+    const { rerender } = render(
+      <GameTable
+        state={state}
+        lockedFor={null}
+        onUnlock={vi.fn()}
+        onAction={vi.fn()}
+        onNewGame={vi.fn()}
+        isBusy
+        presentationMessage="Tomerin considers the room."
+        onSkipPresentation={skip}
+      />,
+    )
+    expect(screen.queryByRole('heading', { name: 'Choose one national policy' })).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Tomerin considers the room.')
+    fireEvent.click(screen.getByRole('button', { name: 'Skip envoy motion' }))
+    expect(skip).toHaveBeenCalledOnce()
+
+    rerender(
+      <GameTable
+        state={state}
+        lockedFor={null}
+        onUnlock={vi.fn()}
+        onAction={vi.fn()}
+        onNewGame={vi.fn()}
+        isBusy
+        presentationMessage="Tomerin considers the room."
+      />,
+    )
+    expect(screen.queryByRole('button', { name: 'Skip envoy motion' })).not.toBeInTheDocument()
+
+    rerender(
+      <GameTable
+        state={state}
+        lockedFor={null}
+        onUnlock={vi.fn()}
+        onAction={vi.fn()}
+        onNewGame={vi.fn()}
+        isBusy
+      />,
+    )
+    expect(screen.getByRole('heading', { name: 'Choose one national policy' })).toBeInTheDocument()
   })
 })

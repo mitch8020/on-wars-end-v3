@@ -1,15 +1,21 @@
 import { useEffect, useState } from 'react'
-import { runAiUntilHumanOrPause } from '../game/ai'
+import { chooseAiAction, describeAi, runAiUntilHumanOrPause } from '../game/ai'
 import { reduceGame, setupGame } from '../game/engine'
 import { isActionPhase, type CountryId, type GameAction, type GameState, type SetupOptions } from '../game/types'
 import { clearSavedGame, readSavedGame, writeSavedGame } from './gameStorage'
 
-function advanceAutomatedTurns(state: GameState): GameState {
-  return state.mode === 'solo' ? runAiUntilHumanOrPause(state) : state
+export type PresentationEvent = {
+  kind: 'ai-turn'
+  country: CountryId
+  message: string
 }
 
 function getHotseatLock(state: GameState): CountryId | null {
   return state.mode === 'hotseat' && isActionPhase(state.phase) ? state.activeCountry : null
+}
+
+function motionDelay() {
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 760
 }
 
 export function useGameSession() {
@@ -23,6 +29,29 @@ export function useGameSession() {
     if (game) writeSavedGame(storage, game)
   }, [game, storage])
 
+  useEffect(() => {
+    if (
+      !game ||
+      game.mode !== 'solo' ||
+      game.ending ||
+      !isActionPhase(game.phase) ||
+      game.controllers[game.activeCountry] !== 'ai'
+    ) {
+      return
+    }
+
+    const action = chooseAiAction(game)!
+    const timer = window.setTimeout(() => {
+      try {
+        setGame(reduceGame(game, action))
+        setError(null)
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : 'That envoy move could not be completed.')
+      }
+    }, motionDelay())
+    return () => window.clearTimeout(timer)
+  }, [game])
+
   const start = (options: SetupOptions) => {
     setGame(setupGame(options))
     setLockedFor(null)
@@ -31,15 +60,14 @@ export function useGameSession() {
 
   const resume = () => {
     if (!savedGame) return
-    const next = advanceAutomatedTurns(savedGame)
-    setGame(next)
-    setLockedFor(getHotseatLock(next))
+    setGame(savedGame)
+    setLockedFor(getHotseatLock(savedGame))
   }
 
   const dispatch = (action: GameAction) => {
     if (!game) return
     try {
-      const next = advanceAutomatedTurns(reduceGame(game, action))
+      const next = reduceGame(game, action)
       setLockedFor(getHotseatLock(next))
       setGame(next)
       setError(null)
@@ -56,15 +84,41 @@ export function useGameSession() {
     setError(null)
   }
 
+  const skipPresentation = () => {
+    if (!game || game.mode !== 'solo') return
+    const next = runAiUntilHumanOrPause(game)
+    setGame(next)
+    setError(null)
+  }
+
+  const aiIsMoving = Boolean(
+    game &&
+      game.mode === 'solo' &&
+      !game.ending &&
+      isActionPhase(game.phase) &&
+      game.controllers[game.activeCountry] === 'ai',
+  )
+  const presentation: PresentationEvent | null =
+    game && aiIsMoving
+      ? {
+          kind: 'ai-turn',
+          country: game.activeCountry,
+          message: describeAi(game, game.activeCountry),
+        }
+      : null
+
   return {
     game,
     savedGame,
     lockedFor,
     error,
+    presentation,
+    isBusy: aiIsMoving,
     start,
     resume,
     dispatch,
     newGame,
+    skipPresentation,
     unlock: () => setLockedFor(null),
     dismissError: () => setError(null),
   }

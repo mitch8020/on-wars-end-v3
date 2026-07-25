@@ -24,6 +24,9 @@ export default function App() {
         onUnlock={session.unlock}
         onAction={session.dispatch}
         onNewGame={session.newGame}
+        isBusy={session.isBusy}
+        presentationMessage={session.presentation?.message}
+        onSkipPresentation={session.skipPresentation}
       />
       {session.error && (
         <div className="error-toast" role="alert">

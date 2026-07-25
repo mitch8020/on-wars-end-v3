@@ -97,6 +97,13 @@ describe('cabinet actions', () => {
     const onAction = vi.fn()
     const { rerender } = render(<CabinetActions state={state} onAction={onAction} />)
     expect(screen.getByText('Factory conversion').closest('button')).toHaveClass('unaffordable')
+    const factory = screen.getByText('Factory conversion').closest('button')!
+    const stateVisit = screen.getByText('State visit').closest('button')!
+    fireEvent.keyDown(factory, { key: 'Enter' })
+    fireEvent.keyDown(factory, { key: 'ArrowRight' })
+    expect(stateVisit).toHaveFocus()
+    fireEvent.keyDown(stateVisit, { key: 'ArrowLeft' })
+    expect(factory).toHaveFocus()
 
     fireEvent.click(screen.getByRole('button', { name: /Emergency harvest/ }))
     fireEvent.click(screen.getByRole('button', { name: /Enact Emergency harvest/ }))
@@ -109,7 +116,7 @@ describe('cabinet actions', () => {
 
     state.countries[country].resources.capital = 3
     rerender(<CabinetActions state={state} onAction={onAction} />)
-    fireEvent.click(screen.getByRole('button', { name: /State visit/ }))
+    fireEvent.click(screen.getByText('State visit').closest('button')!)
     expect(screen.getByText('Choose a partner')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Enact State visit/ })).toBeDisabled()
     const target = state.countryOrder.find((candidate) => candidate !== country)!

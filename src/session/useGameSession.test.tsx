@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setupGame } from '../game/engine'
 import { SAVE_KEY } from './gameStorage'
 import { useGameSession } from './useGameSession'
@@ -9,6 +9,11 @@ import { useGameSession } from './useGameSession'
 describe('useGameSession', () => {
   beforeEach(() => {
     window.localStorage.clear()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
   })
 
   it('starts, saves, dispatches, locks, reports errors, unlocks, and resets hotseat play', async () => {
@@ -99,5 +104,85 @@ describe('useGameSession', () => {
     act(() => second.result.current.resume())
     expect(second.result.current.game).toEqual(hotseat)
     expect(second.result.current.lockedFor).toBeNull()
+  })
+
+  it('stages one AI action at a time and can skip the remaining envoy motion', () => {
+    vi.useFakeTimers()
+    const matchMedia = vi.fn().mockReturnValue({ matches: false } as MediaQueryList)
+    vi.stubGlobal('matchMedia', matchMedia)
+    const first = renderHook(() => useGameSession())
+    act(() => {
+      first.result.current.skipPresentation()
+      first.result.current.start({
+        playerCount: 2,
+        mode: 'solo',
+        humanCountry: 'tomerin',
+        seed: 148802,
+      })
+    })
+    act(() => {
+      first.result.current.dispatch({ type: 'ACKNOWLEDGE_BRIEFING' })
+    })
+    expect(first.result.current.isBusy).toBe(true)
+    expect(first.result.current.presentation).toMatchObject({
+      kind: 'ai-turn',
+      country: 'aravell',
+    })
+    act(() => vi.advanceTimersByTime(760))
+    expect(first.result.current.game?.activeCountry).toBe('tomerin')
+    expect(first.result.current.isBusy).toBe(false)
+    first.unmount()
+
+    const second = renderHook(() => useGameSession())
+    act(() => {
+      second.result.current.start({
+        playerCount: 2,
+        mode: 'solo',
+        humanCountry: 'tomerin',
+        seed: 148802,
+      })
+    })
+    act(() => {
+      second.result.current.dispatch({ type: 'ACKNOWLEDGE_BRIEFING' })
+    })
+    expect(second.result.current.isBusy).toBe(true)
+    act(() => second.result.current.skipPresentation())
+    expect(second.result.current.game?.activeCountry).toBe('tomerin')
+    expect(second.result.current.isBusy).toBe(false)
+    second.unmount()
+
+    matchMedia.mockReturnValue({ matches: true } as MediaQueryList)
+    const reduced = renderHook(() => useGameSession())
+    act(() => {
+      reduced.result.current.start({
+        playerCount: 2,
+        mode: 'solo',
+        humanCountry: 'tomerin',
+        seed: 148802,
+      })
+    })
+    act(() => {
+      reduced.result.current.dispatch({ type: 'ACKNOWLEDGE_BRIEFING' })
+    })
+    act(() => {
+      vi.runAllTimers()
+    })
+    expect(reduced.result.current.game?.activeCountry).toBe('tomerin')
+    reduced.unmount()
+  })
+
+  it('does not skip presentation for a hotseat table', () => {
+    const { result } = renderHook(() => useGameSession())
+    act(() => {
+      result.current.start({
+        playerCount: 2,
+        mode: 'hotseat',
+        humanCountry: 'aravell',
+        seed: 2,
+      })
+    })
+    const before = result.current.game
+    act(() => result.current.skipPresentation())
+    expect(result.current.game).toBe(before)
   })
 })

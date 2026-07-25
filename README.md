@@ -45,6 +45,12 @@ v2 is a faithful two-country implementation of the original rules. v3 is a gamep
 - Public summit proposals, bilateral backchannels, permanent signatures, and hidden mandate discovery.
 - Deterministic seeds, replayable setups, automatic local saves, and an in-game rules guide.
 - Pure state transitions with invariant checks after every action.
+- A state-driven Three.js peace table with physical delegation mats, resource pieces, crisis and policy decks,
+  signature seals, and illuminated Trust cords.
+- Tactile policy hands with sequenced dealing, card backs, keyboard navigation, reduced-motion behavior, and
+  hotseat-safe reveals.
+- Guided table cameras, responsive folio drawers, a non-WebGL fallback, optional procedural table sounds, and
+  staged AI turns that can be skipped without changing their deterministic decisions.
 
 See [RULES.md](./RULES.md) for the complete rules.
 
@@ -79,15 +85,20 @@ src/
     ai/              phase strategies, scoring, reserves, and turn execution
     engine.test.ts   rules and complete-game simulation coverage
   components/
-    TreatyWeb.tsx    central relationship board
+    tabletop/        lazy Three.js table, accessible fallback, and guided scene shell
+    TreatyWeb.tsx    accessible two-dimensional relationship fallback
     ActionDock.tsx   current-phase coordinator
     actions/         isolated controls for each round phase
     actions/summit/  Accord, Exchange, and Backchannel workspaces
     Overlays.tsx     stable public overlay API
     overlays/        reference drawer, pass curtain, and final communiqué
     ...              setup, tracks, dossiers, overlays, and table shell
+  presentation/
+    tableViewModel.ts  pure mapping from GameState to seats, Trust cords, proposals, and pieces
+    useTableAudio.ts   muted-by-default procedural table cues
+    webgl.ts           capability check for the accessible fallback
   session/
-    useGameSession.ts  browser game lifecycle, AI turns, and hotseat privacy
+    useGameSession.ts  browser lifecycle, staged AI turns, and hotseat privacy
     gameStorage.ts     validated local save adapter
 ```
 

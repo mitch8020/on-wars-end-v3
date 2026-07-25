@@ -19,10 +19,13 @@ function emptySession(): ReturnType<typeof UseGameSession> {
     savedGame: null,
     lockedFor: null,
     error: null,
+    presentation: null,
+    isBusy: false,
     start: vi.fn(),
     resume: vi.fn(),
     dispatch: vi.fn(),
     newGame: vi.fn(),
+    skipPresentation: vi.fn(),
     unlock: vi.fn(),
     dismissError: vi.fn(),
   }

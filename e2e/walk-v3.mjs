@@ -69,6 +69,7 @@ await page.screenshot({ path: join(shots, '02-briefing.png'), fullPage: true })
 
 await page.getByRole('button', { name: 'Open cabinet' }).click()
 await page.getByRole('heading', { name: 'Choose one national policy' }).waitFor()
+await page.waitForTimeout(900)
 await page.screenshot({ path: join(shots, '03-cabinet.png'), fullPage: true })
 
 const actionButton = page.locator('.cabinet-actions .action-button')
@@ -95,7 +96,9 @@ await page.getByRole('button', { name: 'Sign the Vellan Accord' }).waitFor()
 
 for (let turn = 0; turn < 50; turn += 1) {
   if (await page.locator('.ending-communique').isVisible()) break
-  if (await page.getByRole('heading', { name: 'Make one diplomatic move' }).isVisible()) {
+  if (await page.getByRole('button', { name: 'Skip envoy motion' }).isVisible()) {
+    await page.getByRole('button', { name: 'Skip envoy motion' }).click({ force: true, timeout: 1_000 }).catch(() => {})
+  } else if (await page.getByRole('heading', { name: 'Make one diplomatic move' }).isVisible()) {
     const sign = page.getByRole('button', { name: 'Sign the Vellan Accord' })
     if (await sign.isEnabled()) {
       await sign.click()
@@ -126,6 +129,7 @@ for (let turn = 0; turn < 50; turn += 1) {
 }
 await page.locator('.ending-communique').waitFor()
 await page.screenshot({ path: join(shots, '06-ending.png'), fullPage: true })
+await page.close()
 
 const resume = await checkedPage('resume', {
   viewport: { width: 1440, height: 950 },
@@ -229,17 +233,21 @@ assert.equal(
   trade.recipientWant - 1,
 )
 assert.equal(tradedState.trust[trade.trustKey], Math.min(4, trade.trust + 1))
+await hotseat.close()
 
 const mobile = await checkedPage('mobile', {
   viewport: { width: 390, height: 844 },
   deviceScaleFactor: 1,
 })
+await mobile.emulateMedia({ reducedMotion: 'reduce' })
 await resetSetup(mobile)
 await mobile.screenshot({ path: join(shots, '08-mobile-setup.png'), fullPage: true })
 await mobile.getByRole('button', { name: 'Convene the table' }).click()
 await mobile.getByRole('button', { name: 'Open cabinet' }).click()
 await mobile.getByRole('heading', { name: 'Choose one national policy' }).waitFor()
-await mobile.screenshot({ path: join(shots, '09-mobile-table.png'), fullPage: true })
+await mobile.evaluate(() => window.scrollTo(0, 0))
+await mobile.screenshot({ path: join(shots, '09-mobile-table.png'), fullPage: true, animations: 'disabled' })
+await mobile.close()
 
 await browser.close()
 if (errors.length) {

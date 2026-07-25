@@ -9,7 +9,12 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**/*.{ts,tsx}'],
-      exclude: ['src/**/*.test.{ts,tsx}', 'src/test/**'],
+      exclude: [
+        'src/**/*.test.{ts,tsx}',
+        'src/test/**',
+        // WebGL rendering is verified in the real-browser walkthrough; its state mapping remains unit covered.
+        'src/components/tabletop/ThreeTable.tsx',
+      ],
       reporter: ['text', 'json-summary', 'html'],
       reportOnFailure: true,
       thresholds: {
