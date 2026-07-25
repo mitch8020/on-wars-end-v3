@@ -25,6 +25,10 @@ const declaredTags = new Set((save.ComponentTags?.labels ?? []).map((tag) => tag
 
 assert(save.SaveName === "On War's End v3 — The Vellan Accord", 'Unexpected save name.')
 assert(save.VersionNumber === 'v13.3', 'Unexpected TTS save version.')
+assert(save.Lighting?.LightIntensity === 0.66, 'Directional table lighting is not production-calibrated.')
+assert(save.Lighting?.AmbientIntensity === 0.72, 'Ambient table lighting is not production-calibrated.')
+assert(save.Lighting?.ReflectionIntensity === 0.55, 'Table reflections are not production-calibrated.')
+assert(save.Lighting?.LutContribution === 0.42, 'Table color grading is not production-calibrated.')
 assert(Object.keys(save.TabStates ?? {}).length === 12, 'Expected all twelve TTS notebook tabs.')
 assert(
   save.Turns?.Enable === false && save.Turns?.Type === 0 && save.Turns?.TurnOrder?.length === 0,
@@ -125,6 +129,7 @@ const requiredLuaFragments = [
   'function dealPolicyHands',
   'function finishConference',
   'function uiTogglePanel',
+  'function frameOverview',
 ]
 for (const fragment of requiredLuaFragments) {
   assert(save.LuaScript.includes(fragment), `Global Lua is missing ${fragment}.`)
@@ -139,8 +144,10 @@ assert(uiIds.length === new Set(uiIds).size, 'Global UI element ids must be uniq
 assert(save.XmlUI.includes('offsetXY="-24 -24"'), 'The conference clock must use a screen-space offset.')
 assert(!save.XmlUI.includes('position="-24 -24"'), 'The conference clock still uses the wrong 3D position attribute.')
 assert(save.XmlUI.includes('preferredHeight="54"'), 'The primary clock action is missing an explicit layout height.')
+assert(save.XmlUI.includes('id="activeText"') && save.XmlUI.includes('preferredHeight="46"'), 'The active roster cannot render its full two-line label.')
 assert(save.XmlUI.includes('id="finishButton"'), 'The guarded all-signatures action is missing.')
 assert(save.XmlUI.includes('id="collapseButton"'), 'The collapsible conference docket control is missing.')
+assert(save.XmlUI.includes('id="overviewButton"'), 'The per-player table overview control is missing.')
 
 const uiHandlers = [
   ...save.XmlUI.matchAll(/\bon(?:Click|ValueChanged|EndEdit)="([^"]+)"/g),

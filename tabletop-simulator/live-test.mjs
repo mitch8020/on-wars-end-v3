@@ -190,11 +190,14 @@ local snapshotOk, snapshotError = pcall(function()
         ui = {
             phase = UI.getValue("phaseText"),
             active = UI.getValue("activeText"),
+            roster = UI.getValue("rosterText"),
+            instruction = UI.getValue("instructionText"),
             advance = UI.getValue("advanceButton"),
             startActive = UI.getAttribute("startButton", "active"),
             advanceActive = UI.getAttribute("advanceButton", "active"),
             finishActive = UI.getAttribute("finishButton", "active"),
             finishLabel = UI.getValue("finishButton"),
+            toolsActive = UI.getAttribute("clockTools", "active"),
             bodyActive = UI.getAttribute("clockBody", "active"),
             panelHeight = UI.getAttribute("clockPanel", "height"),
         },
@@ -330,7 +333,9 @@ updateAll()
   assert.equal(waiting.state.playerCount, 6)
   assert(isTrue(waiting.ui.startActive), 'Setup must expose the start action.')
   assert(isFalse(waiting.ui.advanceActive), 'Setup must hide the advance action.')
-  assert.match(waiting.ui.active, /First 6 countries/)
+  assert.equal(waiting.ui.active, 'ARAVELL · TOMERIN · VEYRA\nKARSK · BELOVAR · NAMARRA')
+  assert.match(waiting.ui.roster, /0 \/ 6 SEATED · 6 ACTIVE/)
+  assert.match(waiting.ui.instruction, /Sit in the matching color seats/)
 
   const opened = await snapshot(bridge, 'conference start, deterministic chair, and counter reset', 'startConference()')
   assert.equal(opened.state.started, true)
@@ -354,6 +359,7 @@ advanceClock()
   assert.equal(cabinet.state.turnIndex, 1)
   assert.equal(cabinet.turns.enable, true)
   assert.equal(cabinet.turns.turnColor, cabinet.turns.order[0])
+  assert.match(cabinet.ui.roster, /1 \/ 6 SEATED · 6 ACTIVE/)
   for (const country of ['aravell', 'tomerin', 'veyra', 'karsk', 'belovar', 'namarra']) {
     assert.equal(cabinet.handPolicies[country], 3, `${country} should receive three policy cards.`)
     assert.equal(cabinet.decks[country], 13, `${country} deck should retain thirteen cards.`)
@@ -407,10 +413,77 @@ advanceClock()
   assert.equal(nextRound.state.chairIndex, (opened.state.chairIndex % 6) + 1)
   assert.match(nextRound.status, /Table step/)
 
+  const overview = await snapshot(
+    bridge,
+    'per-player Overview frames the table without changing clock state',
+    'uiOverview(Player[SEAT_COLORS[chairCountry()]])',
+  )
+  assert.equal(overview.state.round, 2)
+  assert.equal(overview.state.phase, 'briefing')
+
   const collapsed = await snapshot(bridge, 'docket collapses without changing conference state', 'uiTogglePanel(nil)')
   assert.equal(collapsed.panelCollapsed, true)
   assert(isFalse(collapsed.ui.bodyActive))
   assert.equal(String(collapsed.ui.panelHeight), '70')
+
+  const twoPlayerSetup = await snapshot(
+    bridge,
+    'two-country roster starts with Aravell in the deterministic chair',
+    `
+for _, country in ipairs(COUNTRIES) do
+    local deck = getObjectFromGUID(POLICY_DECKS[country])
+    if deck then
+        local tag = "Policy_" .. country
+        for _, object in ipairs(getAllObjects()) do
+            if object ~= deck and object.hasTag(tag) then deck.putObject(object) end
+        end
+    end
+end
+for _, player in ipairs(Player.getPlayers()) do
+    if player.color ~= "White" then player.changeColor("White") end
+end
+state = {
+    started = false,
+    playerCount = 2,
+    dispatchCode = 148802,
+    round = 1,
+    phase = "briefing",
+    chairIndex = 1,
+    turnIndex = 1,
+}
+finishArmed = false
+panelCollapsed = false
+updateAll()
+startConference()
+`,
+    1.2,
+  )
+  assert.equal(twoPlayerSetup.state.playerCount, 2)
+  assert.equal(twoPlayerSetup.state.chairIndex, 1)
+  assert.equal(twoPlayerSetup.refugee, 4)
+  assert.match(twoPlayerSetup.ui.roster, /0 \/ 2 SEATED · 2 ACTIVE/)
+
+  const twoPlayerCabinet = await snapshot(
+    bridge,
+    'two-country Cabinet seats only active countries and deals only their decks',
+    `
+if Player["White"].seated then Player["White"].changeColor("Blue") end
+advanceClock()
+`,
+    2.5,
+  )
+  assert.deepEqual(twoPlayerCabinet.turns.order, ['Blue', 'Red'])
+  assert.equal(twoPlayerCabinet.turns.enable, true)
+  assert.equal(twoPlayerCabinet.turns.turnColor, 'Blue')
+  assert.match(twoPlayerCabinet.ui.roster, /1 \/ 2 SEATED · 2 ACTIVE/)
+  for (const country of ['aravell', 'tomerin']) {
+    assert.equal(twoPlayerCabinet.handPolicies[country], 3)
+    assert.equal(twoPlayerCabinet.decks[country], 13)
+  }
+  for (const country of ['veyra', 'karsk', 'belovar', 'namarra']) {
+    assert.equal(twoPlayerCabinet.handPolicies[country], 0)
+    assert.equal(twoPlayerCabinet.decks[country], 16)
+  }
 
   const reset = await snapshot(
     bridge,
@@ -439,15 +512,20 @@ state = {
 }
 finishArmed = false
 panelCollapsed = false
+resetCounters()
 updateAll()
+frameOverview(Player["White"])
 `,
     1.2,
   )
   assert.equal(reset.state.started, false)
   assert(isTrue(reset.ui.bodyActive))
-  assert.equal(String(reset.ui.panelHeight), '476')
+  assert(isTrue(reset.ui.toolsActive), 'Overview and Status must remain available during setup.')
+  assert.equal(String(reset.ui.panelHeight), '492')
+  assert.match(reset.ui.roster, /0 \/ 6 SEATED · 6 ACTIVE/)
+  assert.equal(reset.refugee, 12, 'Cleanup must restore the six-player refugee counter.')
 
-  console.log('Live TTS verification passed: setup, deterministic start, deals, cadence, signed ending, undo, chair rotation, and collapse.')
+  console.log('Live TTS verification passed: setup tools, 2/6-player rosters, deals, cadence, signed ending, undo, chair rotation, overview, and collapse.')
 } catch (error) {
   failure = error
   console.error(`Live TTS verification failed: ${error.message}`)

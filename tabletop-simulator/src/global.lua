@@ -32,6 +32,7 @@ INSTRUCTIONS = {
     aftermath = "Resolve the communiqué, clear proposals, and prepare the next round.",
     ended = "All countries signed, or Round 6 ended. Read the final communiqué.",
 }
+SETUP_INSTRUCTION = "Sit in the matching color seats. Choose the active roster and dispatch, then open the conference."
 ADVANCE_LABELS = {
     briefing = "BEGIN CABINET",
     cabinet = "END CABINET TURN",
@@ -144,6 +145,31 @@ function activeOrder()
     return order
 end
 
+function activeRosterNames()
+    local names = {}
+    for index = 1, state.playerCount do
+        table.insert(names, string.upper(COUNTRY_NAMES[COUNTRIES[index]]))
+    end
+    if #names > 3 then
+        local first_row = {}
+        local second_row = {}
+        for index, name in ipairs(names) do
+            table.insert(index <= 3 and first_row or second_row, name)
+        end
+        return table.concat(first_row, " · ") .. "\n" .. table.concat(second_row, " · ")
+    end
+    return table.concat(names, " · ")
+end
+
+function seatedDelegationCount()
+    local count = 0
+    for index = 1, state.playerCount do
+        local player = Player[SEAT_COLORS[COUNTRIES[index]]]
+        if player and player.seated then count = count + 1 end
+    end
+    return count
+end
+
 function statusLine()
     if not state.started then
         return "Waiting for setup · " .. tostring(state.playerCount) .. " countries · dispatch " .. tostring(state.dispatchCode)
@@ -158,6 +184,11 @@ function statusLine()
     end
     return "Round " .. tostring(state.round) .. "/6 · " .. PHASE_NAMES[state.phase] ..
         " · Chair " .. COUNTRY_NAMES[chairCountry()] .. " · Active " .. COUNTRY_NAMES[activeCountry()]
+end
+
+function currentInstruction()
+    if not state.started then return SETUP_INSTRUCTION end
+    return INSTRUCTIONS[state.phase]
 end
 
 function isHostOrPromoted(player)
@@ -255,9 +286,39 @@ function uiStatus(player)
     broadcastStatus(player and player.color or nil)
 end
 
+function uiOverview(player)
+    frameOverview(player)
+end
+
 function uiTogglePanel(player)
     panelCollapsed = not panelCollapsed
     applyPanelState()
+end
+
+function frameOverview(player)
+    if not player then return end
+    player.lookAt({
+        position = {x = 0, y = 0, z = 0},
+        pitch = 62,
+        yaw = 180,
+        distance = 55,
+    })
+end
+
+function scheduleSeatRefresh()
+    Wait.frames(function() updateUI() end, 2)
+end
+
+function onPlayerChangeColor(player_color)
+    scheduleSeatRefresh()
+end
+
+function onPlayerConnect(player)
+    scheduleSeatRefresh()
+end
+
+function onPlayerDisconnect(player)
+    scheduleSeatRefresh()
 end
 
 function uiFinishConference(player)
@@ -393,11 +454,13 @@ function updateUI()
     local is_setup = not state.started
     local is_running = state.started and state.phase ~= "ended"
     local can_finish = state.started and (state.phase == "summit" or state.phase == "aftermath")
+    local seated = seatedDelegationCount()
     UI.setValue("roundText", state.started and ("ROUND " .. tostring(state.round) .. " / 6") or "CONFERENCE SETUP")
-    UI.setValue("rosterText", tostring(state.playerCount) .. " DELEGATIONS · FIXED ROSTER")
+    UI.setValue("rosterText", tostring(seated) .. " / " .. tostring(state.playerCount) .. " SEATED · " ..
+        tostring(state.playerCount) .. " ACTIVE")
     UI.setValue("phaseText", state.started and PHASE_NAMES[state.phase] or "Choose the delegation roster")
     if is_setup then
-        UI.setValue("activeText", "First " .. tostring(state.playerCount) .. " countries in the roster will play.")
+        UI.setValue("activeText", activeRosterNames())
     elseif actionPhase() then
         UI.setValue("activeText", "CHAIR  " .. COUNTRY_NAMES[chairCountry()] ..
             "    /    ACTING  " .. COUNTRY_NAMES[activeCountry()])
@@ -408,8 +471,7 @@ function updateUI()
     else
         UI.setValue("activeText", "CHAIR  " .. COUNTRY_NAMES[chairCountry()] .. "    /    TABLE STEP")
     end
-    UI.setValue("instructionText", state.started and INSTRUCTIONS[state.phase] or
-        "The clock runs chair order and phase cadence. Pieces and rule outcomes stay tactile.")
+    UI.setValue("instructionText", currentInstruction())
     UI.setValue("advanceButton", state.started and ADVANCE_LABELS[state.phase] or "Start first")
     UI.setAttribute("playerCount", "value", state.playerCount - 2)
     UI.setAttribute("playerCount", "interactable", is_setup)
@@ -418,7 +480,7 @@ function updateUI()
     UI.setAttribute("setupControls", "active", is_setup)
     UI.setAttribute("startButton", "active", is_setup)
     UI.setAttribute("advanceButton", "active", is_running)
-    UI.setAttribute("clockTools", "active", state.started)
+    UI.setAttribute("clockTools", "active", true)
     UI.setAttribute("advanceButton", "interactable", is_running)
     UI.setAttribute("backButton", "interactable", state.started)
     UI.setAttribute("finishButton", "active", can_finish)
@@ -443,7 +505,7 @@ end
 
 function applyPanelState()
     UI.setAttribute("clockBody", "active", not panelCollapsed)
-    UI.setAttribute("clockPanel", "height", panelCollapsed and "70" or "476")
+    UI.setAttribute("clockPanel", "height", panelCollapsed and "70" or "492")
     UI.setValue("collapseButton", panelCollapsed and "+" or "−")
 end
 
@@ -563,7 +625,7 @@ function dealPolicyHands()
 end
 
 function broadcastStatus(target_color)
-    local message = "[On War's End] " .. statusLine() .. ". " .. INSTRUCTIONS[state.phase]
+    local message = "[On War's End] " .. statusLine() .. ". " .. currentInstruction()
     if target_color then
         broadcastToColor(message, target_color, {0.89, 0.76, 0.45})
     else
@@ -603,7 +665,7 @@ function onChat(message, sender)
     if not message or string.sub(string.lower(message), 1, 4) ~= "!owe" then return true end
     local command = string.lower(message)
     if command == "!owe help" then
-        broadcastToColor("!owe status · !owe next · !owe back · !owe finish. Host/promoted players control the clock; reload the save to reset the physical table.", sender.color, {0.89, 0.76, 0.45})
+        broadcastToColor("!owe status · !owe next · !owe back · !owe finish · !owe view. Host/promoted players control the clock; reload the save to reset the physical table.", sender.color, {0.89, 0.76, 0.45})
     elseif command == "!owe status" then
         broadcastStatus(sender.color)
     elseif command == "!owe next" then
@@ -612,6 +674,8 @@ function onChat(message, sender)
         if requireControl(sender) then stepBack() end
     elseif command == "!owe finish" then
         if requireControl(sender) then finishConference(sender.color) end
+    elseif command == "!owe view" then
+        frameOverview(sender)
     else
         broadcastToColor("Unknown command. Type !owe help.", sender.color, {0.93, 0.42, 0.36})
     end

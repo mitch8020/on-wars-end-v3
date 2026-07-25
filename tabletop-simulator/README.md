@@ -69,15 +69,15 @@ The asset references are native absolute Windows paths. They work for single-pla
 
 ## At the table
 
-1. Sit in the country color shown on each mat.
-2. In the floating panel, choose 2–6 countries and enter a dispatch code.
+1. Sit in the country color shown on each mat. The docket reports how many active delegations are seated.
+2. In the floating panel, choose 2–6 countries and enter a dispatch code. The active country names update immediately.
 3. Select **Start conference**.
 4. Reveal the top Crisis card and select **Begin Cabinet**.
 5. Use **NEXT** after the active delegation completes its move.
 6. Use **BACK** only to repair the clock. It does not undo pieces already moved.
 7. When every active delegation has moved its signature seal, use the guarded **ALL SIGNED** action twice to close the conference immediately.
 
-The conference docket can be collapsed from its upper-right control. Its numbered rail shows the current table step without replacing the physical phase marker.
+The conference docket can be collapsed from its upper-right control. Its numbered rail shows the current table step without replacing the physical phase marker. Use **OVERVIEW** (or `!owe view`) to restore the tested full-table camera framing for your player.
 
 Hotkeys are available from **Options → Game Keys**:
 
@@ -93,6 +93,7 @@ Chat commands:
 !owe next
 !owe back
 !owe finish
+!owe view
 ```
 
 Reload the original save to reset every physical component for a new game.

@@ -1,6 +1,6 @@
 <Panel id="clockPanel"
        width="516"
-       height="476"
+       height="492"
        rectAlignment="UpperRight"
        offsetXY="-24 -24"
        color="#171816F4"
@@ -25,7 +25,7 @@
               textColor="#E8D6A7">−</Button>
     </HorizontalLayout>
 
-    <Panel id="clockBody" preferredHeight="398" color="#00000000">
+    <Panel id="clockBody" preferredHeight="414" color="#00000000">
       <VerticalLayout spacing="8" childForceExpandWidth="true" childForceExpandHeight="false">
         <HorizontalLayout preferredHeight="26" spacing="10" childForceExpandHeight="true">
           <Text id="roundText"
@@ -60,10 +60,13 @@
               color="#F2E8D1"
               alignment="MiddleLeft">Choose the delegation roster</Text>
         <Text id="activeText"
-              preferredHeight="30"
-              fontSize="19"
+              preferredHeight="46"
+              fontSize="16"
               color="#8FC0B6"
-              alignment="MiddleLeft">First 6 countries in the roster will play.</Text>
+              alignment="MiddleLeft"
+              horizontalOverflow="Wrap"
+              verticalOverflow="Overflow">ARAVELL · TOMERIN · VEYRA
+KARSK · BELOVAR · NAMARRA</Text>
         <Text id="instructionText"
               preferredHeight="54"
               fontSize="16"
@@ -76,9 +79,9 @@
                           preferredHeight="44"
                           spacing="8"
                           childForceExpandHeight="true">
-          <Text preferredWidth="80" fontSize="15" color="#AAA69B" alignment="MiddleLeft">COUNTRIES</Text>
+          <Text preferredWidth="70" fontSize="15" color="#AAA69B" alignment="MiddleLeft">ROSTER</Text>
           <Dropdown id="playerCount"
-                    preferredWidth="70"
+                    preferredWidth="66"
                     onValueChanged="uiPlayerCount"
                     value="4"
                     fontSize="18"
@@ -94,9 +97,9 @@
             <Option>5</Option>
             <Option selected="true">6</Option>
           </Dropdown>
-          <Text preferredWidth="72" fontSize="15" color="#AAA69B" alignment="MiddleLeft">DISPATCH</Text>
+          <Text preferredWidth="80" fontSize="15" color="#AAA69B" alignment="MiddleLeft">DISPATCH</Text>
           <InputField id="dispatchCode"
-                      preferredWidth="224"
+                      preferredWidth="232"
                       onEndEdit="uiDispatch"
                       characterValidation="Integer"
                       characterLimit="9"
@@ -126,21 +129,27 @@
 
         <HorizontalLayout id="clockTools"
                           preferredHeight="40"
-                          active="false"
+                          active="true"
                           spacing="8"
                           childForceExpandHeight="true">
           <Button id="backButton"
                   onClick="uiBack"
-                  fontSize="16"
+                  fontSize="14"
                   tooltip="Repair the clock only; physical pieces are not undone"
                   colors="#3B3E39|#4C5049|#2A2C28|#666860"
-                  textColor="#F2E8D1">BACK  /  CLOCK ONLY</Button>
+                  textColor="#F2E8D1">BACK / CLOCK</Button>
           <Button id="statusButton"
                   onClick="uiStatus"
-                  fontSize="16"
+                  fontSize="14"
                   tooltip="Print the current chair, phase, and instruction to chat"
                   colors="#3B3E39|#4C5049|#2A2C28|#666860"
-                  textColor="#F2E8D1">READ STATUS</Button>
+                  textColor="#F2E8D1">STATUS</Button>
+          <Button id="overviewButton"
+                  onClick="uiOverview"
+                  fontSize="14"
+                  tooltip="Frame the full public table for your current player"
+                  colors="#3B3E39|#4C5049|#2A2C28|#666860"
+                  textColor="#F2E8D1">OVERVIEW</Button>
         </HorizontalLayout>
 
         <Button id="finishButton"
