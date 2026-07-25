@@ -86,6 +86,7 @@ function onLoad(saved_data)
         updateAll()
         printToAll("[On War's End] Conference clock ready. Type !owe help for commands.", {0.89, 0.76, 0.45})
     end, 3)
+    Wait.time(frameSetupHost, 6)
 end
 
 function onSave()
@@ -305,6 +306,16 @@ function frameOverview(player)
     })
 end
 
+function frameSetupHost()
+    if state.started then return end
+    for _, player in ipairs(Player.getPlayers()) do
+        if player.host and player.color == "White" then
+            frameOverview(player)
+            return
+        end
+    end
+end
+
 function scheduleSeatRefresh()
     Wait.frames(function() updateUI() end, 2)
 end
@@ -315,6 +326,7 @@ end
 
 function onPlayerConnect(player)
     scheduleSeatRefresh()
+    if player and player.host then Wait.time(frameSetupHost, 6) end
 end
 
 function onPlayerDisconnect(player)

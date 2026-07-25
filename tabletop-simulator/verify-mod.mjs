@@ -130,6 +130,7 @@ const requiredLuaFragments = [
   'function finishConference',
   'function uiTogglePanel',
   'function frameOverview',
+  'function frameSetupHost',
 ]
 for (const fragment of requiredLuaFragments) {
   assert(save.LuaScript.includes(fragment), `Global Lua is missing ${fragment}.`)

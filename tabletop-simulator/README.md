@@ -77,7 +77,7 @@ The asset references are native absolute Windows paths. They work for single-pla
 6. Use **BACK** only to repair the clock. It does not undo pieces already moved.
 7. When every active delegation has moved its signature seal, use the guarded **ALL SIGNED** action twice to close the conference immediately.
 
-The conference docket can be collapsed from its upper-right control. Its numbered rail shows the current table step without replacing the physical phase marker. Use **OVERVIEW** (or `!owe view`) to restore the tested full-table camera framing for your player.
+The conference docket can be collapsed from its upper-right control. Its numbered rail shows the current table step without replacing the physical phase marker. A spectator host is framed automatically after setup finishes loading; use **OVERVIEW** (or `!owe view`) to restore the same tested full-table framing later.
 
 Hotkeys are available from **Options → Game Keys**:
 
