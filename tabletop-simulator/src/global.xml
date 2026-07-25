@@ -1,0 +1,64 @@
+<Panel id="turnPanel"
+       width="550"
+       height="330"
+       rectAlignment="UpperRight"
+       position="-24 -24"
+       color="#151513EE"
+       padding="18 18 18 18"
+       allowDragging="true">
+  <VerticalLayout spacing="7" childForceExpandHeight="false">
+    <Text fontSize="27" color="#E9D8A9" alignment="MiddleLeft">ON WAR'S END · CONFERENCE CLOCK</Text>
+    <Text id="roundText" fontSize="22" color="#FFFFFF" alignment="MiddleLeft">Round 1 of 6</Text>
+    <Text id="phaseText" fontSize="28" color="#E6B85C" alignment="MiddleLeft">Setup</Text>
+    <Text id="activeText" fontSize="24" color="#FFFFFF" alignment="MiddleLeft">Choose a roster and dispatch code.</Text>
+    <Text id="instructionText" fontSize="17" color="#D5D1C8" alignment="UpperLeft">The clock automates chair order and phase cadence. Pieces and rule outcomes stay tactile.</Text>
+    <HorizontalLayout spacing="8" childForceExpandWidth="true" childForceExpandHeight="false" height="42">
+      <Text fontSize="17" color="#D5D1C8" alignment="MiddleLeft">Countries</Text>
+      <Dropdown id="playerCount"
+                onValueChanged="uiPlayerCount"
+                value="4"
+                fontSize="18"
+                itemHeight="34"
+                dropdownHeight="180"
+                colors="#F4E9D0|#FFF7E7|#CDBB95|#888888"
+                textColor="#181713"
+                itemBackgroundColors="#F4E9D0"
+                itemTextColor="#181713">
+        <Option>2</Option>
+        <Option>3</Option>
+        <Option>4</Option>
+        <Option>5</Option>
+        <Option selected="true">6</Option>
+      </Dropdown>
+      <Text fontSize="17" color="#D5D1C8" alignment="MiddleLeft">Dispatch</Text>
+      <InputField id="dispatchCode"
+                  onEndEdit="uiDispatch"
+                  characterValidation="Integer"
+                  characterLimit="9"
+                  fontSize="18"
+                  textColor="#181713"
+                  colors="#F4E9D0|#FFF7E7|#CDBB95|#888888">148802</InputField>
+    </HorizontalLayout>
+    <HorizontalLayout spacing="8" childForceExpandWidth="true" childForceExpandHeight="false" height="46">
+      <Button id="startButton"
+              onClick="uiStartConference"
+              fontSize="18"
+              textAlignment="MiddleCenter"
+              colors="#385A53|#477068|#29453F|#777777"
+              textColor="#FFFFFF">Start conference</Button>
+      <Button id="advanceButton"
+              onClick="uiAdvance"
+              fontSize="18"
+              textAlignment="MiddleCenter"
+              colors="#A86A35|#C48148|#754821|#777777"
+              textColor="#FFFFFF">Begin Cabinet</Button>
+      <Button id="backButton"
+              onClick="uiBack"
+              fontSize="18"
+              textAlignment="MiddleCenter"
+              colors="#4A4842|#5A5851|#34322F|#777777"
+              textColor="#FFFFFF">Step back</Button>
+    </HorizontalLayout>
+    <Text fontSize="14" color="#9F9B91" alignment="MiddleLeft">Hotkeys: N next · B back · R status · chat: !owe help</Text>
+  </VerticalLayout>
+</Panel>

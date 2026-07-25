@@ -1,0 +1,126 @@
+import { access, readFile } from 'node:fs/promises'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { countries, crises, policies } from './content.mjs'
+
+const here = path.dirname(fileURLToPath(import.meta.url))
+const savePath = process.argv[2] ?? path.join(here, 'dist', 'TS_Save_1.json')
+const save = JSON.parse(await readFile(savePath, 'utf8'))
+const errors = []
+
+function assert(condition, message) {
+  if (!condition) errors.push(message)
+}
+
+function allObjects(objects) {
+  return objects.flatMap((object) => [object, ...allObjects(object.ContainedObjects ?? [])])
+}
+
+const topLevel = save.ObjectStates ?? []
+const recursive = allObjects(topLevel)
+const guids = recursive.map((object) => object.GUID)
+const uniqueGuids = new Set(guids)
+const usedTags = new Set(recursive.flatMap((object) => object.Tags ?? []))
+const declaredTags = new Set((save.ComponentTags?.labels ?? []).map((tag) => tag.displayed))
+
+assert(save.SaveName === "On War's End v3 — The Vellan Accord", 'Unexpected save name.')
+assert(save.VersionNumber === 'v13.3', 'Unexpected TTS save version.')
+assert(Object.keys(save.TabStates ?? {}).length === 12, 'Expected all twelve TTS notebook tabs.')
+assert(
+  save.Turns?.Enable === false && save.Turns?.Type === 0 && save.Turns?.TurnOrder?.length === 0,
+  'The serialized turn system must use TTS safe disabled defaults.',
+)
+assert(typeof save.LuaScript === 'string' && save.LuaScript.length > 5000, 'Global Lua script is missing or too short.')
+assert(typeof save.XmlUI === 'string' && save.XmlUI.includes('turnPanel'), 'Global turn UI is missing.')
+assert(guids.length === uniqueGuids.size, `Duplicate GUIDs found (${guids.length - uniqueGuids.size}).`)
+assert([...usedTags].every((tag) => declaredTags.has(tag)), 'One or more object tags are missing from ComponentTags.')
+assert(
+  (save.ComponentTags?.labels ?? []).every(
+    ({ displayed, normalized }) =>
+      normalized === displayed.toLowerCase().replaceAll(/[^a-z0-9]/g, ''),
+  ),
+  'One or more component-tag normalizations are invalid.',
+)
+assert(!save.LuaScript.includes('__GUIDS__'), 'Unexpanded Global Lua placeholders remain.')
+
+const topByName = (name) => topLevel.filter((object) => object.Name === name)
+const withTag = (tag) => recursive.filter((object) => object.Tags?.includes(tag))
+const topWithTag = (tag) => topLevel.filter((object) => object.Tags?.includes(tag))
+
+assert(topWithTag('CountryMat').length === countries.length, 'Expected six country mats.')
+assert(topWithTag('PolicyDeck').length === countries.length, 'Expected six Cabinet policy decks.')
+assert(withTag('PolicyCard').length === policies.length * countries.length, 'Expected 96 contained policy cards.')
+assert(withTag('CrisisCard').length === crises.length + 1, 'Expected six crisis cards plus the tagged crisis deck.')
+assert(withTag('MandateCard').length === countries.length, 'Expected six private mandate cards.')
+assert(topWithTag('ResourceCube').length === 61, 'Expected 61 starting resource cubes.')
+assert(topWithTag('ResourceSupply').length === 4, 'Expected four infinite resource supply bags.')
+assert(topWithTag('TrustCounter').length === 15, 'Expected all 15 bilateral Trust counters.')
+assert(topWithTag('SignatureSeal').length === countries.length, 'Expected six signature seals.')
+assert(topWithTag('PressureMarker').length === countries.length, 'Expected six pressure markers.')
+assert(topWithTag('PopulationCounter').length === countries.length, 'Expected six Population counters.')
+assert(topWithTag('MilitaryCounter').length === countries.length, 'Expected six Military counters.')
+assert(topWithTag('HandZone').length === countries.length, 'Expected six private hand zones.')
+assert(topWithTag('Controller').length === 1, 'Expected one physical conference console.')
+assert(topWithTag('TurnMarker').length === 1, 'Expected one active delegation marker.')
+assert(topWithTag('PhaseMarker').length === 1, 'Expected one phase marker.')
+assert(topByName('Custom_Board').length === 7, 'Expected one conference board and six country boards.')
+
+for (const country of countries) {
+  const policyDeck = topLevel.find(
+    (object) => object.Tags?.includes('PolicyDeck') && object.Tags?.includes(`Country_${country.id}`),
+  )
+  assert(policyDeck?.ContainedObjects?.length === policies.length, `${country.name} policy deck is incomplete.`)
+  assert(policyDeck?.DeckIDs?.length === policies.length, `${country.name} policy DeckIDs are incomplete.`)
+}
+
+const customAssetUrls = recursive.flatMap((object) => {
+  const urls = []
+  if (object.CustomImage?.ImageURL) urls.push(object.CustomImage.ImageURL)
+  for (const deckState of Object.values(object.CustomDeck ?? {})) {
+    if (deckState.FaceURL) urls.push(deckState.FaceURL)
+    if (deckState.BackURL) urls.push(deckState.BackURL)
+  }
+  return urls
+})
+
+for (const localPath of new Set(customAssetUrls)) {
+  assert(path.isAbsolute(localPath), `Asset path is not absolute: ${localPath}`)
+  assert(!localPath.startsWith('file:'), `File URI found where TTS requires a local path: ${localPath}`)
+  if (path.isAbsolute(localPath)) {
+    try {
+      await access(localPath)
+    } catch {
+      errors.push(`Missing local asset: ${localPath}`)
+    }
+  }
+}
+
+const requiredLuaFragments = [
+  'function onLoad',
+  'function onSave',
+  'function advanceClock',
+  'function stepBack',
+  'function onPlayerTurn',
+  'Turns.order',
+  'Turns.turn_color',
+  'function dealPolicyHands',
+]
+for (const fragment of requiredLuaFragments) {
+  assert(save.LuaScript.includes(fragment), `Global Lua is missing ${fragment}.`)
+}
+
+for (const object of topWithTag('Controller')) {
+  assert(object.LuaScript.includes('Global.call("controllerAdvance"'), 'Controller NEXT button is not wired to Global.')
+}
+
+if (errors.length > 0) {
+  console.error(`Verification failed with ${errors.length} issue(s):`)
+  for (const error of errors) console.error(`- ${error}`)
+  process.exitCode = 1
+} else {
+  console.log(`Verified ${save.SaveName}`)
+  console.log(`Top-level objects: ${topLevel.length}`)
+  console.log(`Recursive objects: ${recursive.length}`)
+  console.log(`Unique local assets: ${new Set(customAssetUrls).size}`)
+  console.log('Turn automation, decks, pieces, trackers, tokens, and private hand zones are present.')
+}
