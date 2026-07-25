@@ -472,7 +472,7 @@ function updateUI()
         UI.setValue("activeText", "CHAIR  " .. COUNTRY_NAMES[chairCountry()] .. "    /    TABLE STEP")
     end
     UI.setValue("instructionText", currentInstruction())
-    UI.setValue("advanceButton", state.started and ADVANCE_LABELS[state.phase] or "Start first")
+    UI.setAttribute("advanceButton", "text", state.started and ADVANCE_LABELS[state.phase] or "Start first")
     UI.setAttribute("playerCount", "value", state.playerCount - 2)
     UI.setAttribute("playerCount", "interactable", is_setup)
     UI.setValue("dispatchCode", tostring(state.dispatchCode))
@@ -484,7 +484,7 @@ function updateUI()
     UI.setAttribute("advanceButton", "interactable", is_running)
     UI.setAttribute("backButton", "interactable", state.started)
     UI.setAttribute("finishButton", "active", can_finish)
-    UI.setValue("finishButton", finishArmed and "CONFIRM ALL SIGNED  /  CLOSE NOW" or
+    UI.setAttribute("finishButton", "text", finishArmed and "CONFIRM ALL SIGNED  /  CLOSE NOW" or
         "ALL SIGNED  /  END CONFERENCE")
     UI.setAttribute("finishButton", "colors", finishArmed and
         "#B25345|#CD6959|#803B32|#666860" or "#704037|#925348|#522E28|#666860")
@@ -506,7 +506,7 @@ end
 function applyPanelState()
     UI.setAttribute("clockBody", "active", not panelCollapsed)
     UI.setAttribute("clockPanel", "height", panelCollapsed and "70" or "492")
-    UI.setValue("collapseButton", panelCollapsed and "+" or "−")
+    UI.setAttribute("collapseButton", "text", panelCollapsed and "+" or "−")
 end
 
 function updateMarkers()

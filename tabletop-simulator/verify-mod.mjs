@@ -148,6 +148,10 @@ assert(save.XmlUI.includes('id="activeText"') && save.XmlUI.includes('preferredH
 assert(save.XmlUI.includes('id="finishButton"'), 'The guarded all-signatures action is missing.')
 assert(save.XmlUI.includes('id="collapseButton"'), 'The collapsible conference docket control is missing.')
 assert(save.XmlUI.includes('id="overviewButton"'), 'The per-player table overview control is missing.')
+assert(save.LuaScript.includes('UI.setAttribute("advanceButton", "text"'), 'The rendered primary-action label is not updated.')
+assert(save.LuaScript.includes('UI.setAttribute("finishButton", "text"'), 'The rendered finish-confirmation label is not updated.')
+assert(save.LuaScript.includes('UI.setAttribute("collapseButton", "text"'), 'The rendered collapse label is not updated.')
+assert(!save.LuaScript.includes('UI.setValue("advanceButton"'), 'Button labels must use the rendered text attribute.')
 
 const uiHandlers = [
   ...save.XmlUI.matchAll(/\bon(?:Click|ValueChanged|EndEdit)="([^"]+)"/g),

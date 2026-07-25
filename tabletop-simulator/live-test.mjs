@@ -166,6 +166,8 @@ local snapshotOk, snapshotError = pcall(function()
     for _, player in ipairs(Player.getPlayers()) do table.insert(seatedColors, player.color) end
     for _, color in ipairs(Turns.order) do table.insert(turnOrder, color) end
     local refugee = getObjectFromGUID(GUIDS.refugeeCounter)
+    local controller = getObjectFromGUID(GUIDS.controller)
+    local controllerButtons = controller and controller.getButtons() or {}
     local snapshot = {
         state = {
             started = state.started,
@@ -192,11 +194,12 @@ local snapshotOk, snapshotError = pcall(function()
             active = UI.getValue("activeText"),
             roster = UI.getValue("rosterText"),
             instruction = UI.getValue("instructionText"),
-            advance = UI.getValue("advanceButton"),
+            advance = UI.getAttribute("advanceButton", "text"),
             startActive = UI.getAttribute("startButton", "active"),
             advanceActive = UI.getAttribute("advanceButton", "active"),
             finishActive = UI.getAttribute("finishButton", "active"),
-            finishLabel = UI.getValue("finishButton"),
+            finishLabel = UI.getAttribute("finishButton", "text"),
+            collapseLabel = UI.getAttribute("collapseButton", "text"),
             toolsActive = UI.getAttribute("clockTools", "active"),
             bodyActive = UI.getAttribute("clockBody", "active"),
             panelHeight = UI.getAttribute("clockPanel", "height"),
@@ -207,6 +210,10 @@ local snapshotOk, snapshotError = pcall(function()
         decks = decks,
         seatedColors = seatedColors,
         refugee = refugee and refugee.getValue() or -1,
+        controller = {
+            status = controllerButtons[1] and controllerButtons[1].label or "",
+            advance = controllerButtons[2] and controllerButtons[2].label or "",
+        },
     }
     snapshotPayload = JSON.encode(snapshot)
 end)
@@ -326,6 +333,9 @@ state = {
 }
 finishArmed = false
 panelCollapsed = false
+for _, player in ipairs(Player.getPlayers()) do
+    if player.color ~= "White" then player.changeColor("White") end
+end
 updateAll()
 `,
   )
@@ -359,6 +369,7 @@ advanceClock()
   assert.equal(cabinet.state.turnIndex, 1)
   assert.equal(cabinet.turns.enable, true)
   assert.equal(cabinet.turns.turnColor, cabinet.turns.order[0])
+  assert.equal(cabinet.ui.advance, 'END CABINET TURN')
   assert.match(cabinet.ui.roster, /1 \/ 6 SEATED · 6 ACTIVE/)
   for (const country of ['aravell', 'tomerin', 'veyra', 'karsk', 'belovar', 'namarra']) {
     assert.equal(cabinet.handPolicies[country], 3, `${country} should receive three policy cards.`)
@@ -372,6 +383,7 @@ advanceClock()
   )
   assert.equal(crisis.state.phase, 'crisis')
   assert.equal(crisis.state.turnIndex, 1)
+  assert.equal(crisis.ui.advance, 'SEAL COMMITMENT')
 
   const summit = await snapshot(
     bridge,
@@ -380,6 +392,7 @@ advanceClock()
   )
   assert.equal(summit.state.phase, 'summit')
   assert.equal(summit.state.turnIndex, 1)
+  assert.equal(summit.ui.advance, 'END SUMMIT TURN')
   assert(isTrue(summit.ui.finishActive), 'Peace Summit must expose the guarded all-signed action.')
 
   const armed = await snapshot(bridge, 'first all-signed action arms a five-second confirmation', 'finishConference()')
@@ -391,6 +404,7 @@ advanceClock()
   assert.equal(signed.state.phase, 'ended')
   assert.equal(signed.state.outcome, 'signed')
   assert.equal(signed.turns.enable, false)
+  assert.equal(signed.ui.advance, 'CONFERENCE CLOSED')
   assert.match(signed.ui.active, /ACCORD COMPLETE/)
 
   const restored = await snapshot(bridge, 'Back restores the exact pre-ending Summit turn', 'stepBack()')
@@ -405,6 +419,7 @@ advanceClock()
   )
   assert.equal(aftermath.state.phase, 'aftermath')
   assert.equal(aftermath.turns.enable, false)
+  assert.equal(aftermath.ui.advance, 'NEXT ROUND')
   assert.match(aftermath.ui.active, /TABLE STEP/)
 
   const nextRound = await snapshot(bridge, 'Aftermath rotates the chair into Round 2 Briefing', 'advanceClock()')
@@ -425,6 +440,145 @@ advanceClock()
   assert.equal(collapsed.panelCollapsed, true)
   assert(isFalse(collapsed.ui.bodyActive))
   assert.equal(String(collapsed.ui.panelHeight), '70')
+  assert.equal(collapsed.ui.collapseLabel, '+')
+
+  const rosterNames = new Map([
+    [3, 'ARAVELL · TOMERIN · VEYRA'],
+    [4, 'ARAVELL · TOMERIN · VEYRA\nKARSK'],
+    [5, 'ARAVELL · TOMERIN · VEYRA\nKARSK · BELOVAR'],
+  ])
+  for (const playerCount of [3, 4, 5]) {
+    const rosterSetup = await snapshot(
+      bridge,
+      `${playerCount}-country setup callback selects the exact active roster`,
+      `
+state = {
+    started = false,
+    playerCount = 6,
+    dispatchCode = 148802,
+    round = 1,
+    phase = "briefing",
+    chairIndex = 1,
+    turnIndex = 1,
+}
+finishArmed = false
+panelCollapsed = false
+for _, player in ipairs(Player.getPlayers()) do
+    if player.color ~= "White" then player.changeColor("White") end
+end
+uiPlayerCount(nil, "${playerCount}")
+`,
+    )
+    assert.equal(rosterSetup.state.playerCount, playerCount)
+    assert.equal(rosterSetup.ui.active, rosterNames.get(playerCount))
+    assert.match(rosterSetup.ui.roster, new RegExp(`0 / ${playerCount} SEATED · ${playerCount} ACTIVE`))
+
+    const rosterOpened = await snapshot(
+      bridge,
+      `${playerCount}-country start sets deterministic chair, counters, and setup lock`,
+      `
+startConference()
+uiPlayerCount(nil, "2")
+`,
+    )
+    assert.equal(rosterOpened.state.playerCount, playerCount, 'Roster changes must lock after opening.')
+    assert.equal(rosterOpened.state.chairIndex, expectedChair(148802, playerCount))
+    assert.equal(rosterOpened.refugee, playerCount * 2)
+    assert.match(rosterOpened.controller.status, new RegExp(`Round 1/6 · Briefing`))
+    assert.equal(rosterOpened.controller.advance, 'BEGIN CABINET')
+  }
+
+  const nativeTurns = await snapshot(
+    bridge,
+    'native three-country turns initialize in conference order',
+    `
+state = {
+    started = true,
+    playerCount = 3,
+    dispatchCode = 148802,
+    round = 3,
+    phase = "cabinet",
+    chairIndex = 1,
+    turnIndex = 1,
+}
+finishArmed = false
+panelCollapsed = false
+if Player["White"].seated then Player["White"].changeColor("Blue") end
+updateAll()
+`,
+  )
+  assert.deepEqual(nativeTurns.turns.order, ['Blue', 'Red', 'Green'])
+  assert.equal(nativeTurns.turns.turnColor, 'Blue')
+
+  const nativeSecond = await snapshot(
+    bridge,
+    'native End Turn advances to the second delegation',
+    'Player["Blue"].changeColor("Red"); Turns.endTurn()',
+    0.8,
+  )
+  assert.equal(nativeSecond.state.phase, 'cabinet')
+  assert.equal(nativeSecond.state.turnIndex, 2)
+  assert.equal(nativeSecond.turns.turnColor, 'Red')
+
+  const nativeThird = await snapshot(
+    bridge,
+    'native End Turn advances to the third delegation',
+    'Player["Red"].changeColor("Green"); Turns.endTurn()',
+    0.8,
+  )
+  assert.equal(nativeThird.state.phase, 'cabinet')
+  assert.equal(nativeThird.state.turnIndex, 3)
+  assert.equal(nativeThird.turns.turnColor, 'Green')
+
+  const nativeCrisis = await snapshot(
+    bridge,
+    'native final End Turn advances exactly once into Crisis Council',
+    'Player["Green"].changeColor("Blue"); Turns.endTurn()',
+    0.8,
+  )
+  assert.equal(nativeCrisis.state.phase, 'crisis')
+  assert.equal(nativeCrisis.state.turnIndex, 1)
+  assert.equal(nativeCrisis.turns.turnColor, 'Blue')
+
+  const roundLimit = await snapshot(
+    bridge,
+    'physical console bridge closes Round 6 from Aftermath',
+    `
+state = {
+    started = true,
+    playerCount = 3,
+    dispatchCode = 148802,
+    round = 6,
+    phase = "aftermath",
+    chairIndex = 2,
+    turnIndex = 1,
+}
+finishArmed = false
+updateAll()
+for _, player in ipairs(Player.getPlayers()) do
+    if player.host then controllerAdvance({color = player.color}) end
+end
+`,
+  )
+  assert.equal(roundLimit.state.phase, 'ended')
+  assert.equal(roundLimit.state.outcome, 'rounds')
+  assert.equal(roundLimit.turns.enable, false)
+  assert.match(roundLimit.ui.active, /SIX ROUNDS COMPLETE/)
+  assert.equal(roundLimit.controller.advance, 'CONFERENCE CLOSED')
+
+  const roundLimitBack = await snapshot(
+    bridge,
+    'physical console Back restores Round 6 Aftermath exactly',
+    `
+for _, player in ipairs(Player.getPlayers()) do
+    if player.host then controllerBack({color = player.color}) end
+end
+`,
+  )
+  assert.equal(roundLimitBack.state.round, 6)
+  assert.equal(roundLimitBack.state.phase, 'aftermath')
+  assert.equal(roundLimitBack.state.outcome, undefined)
+  assert.equal(roundLimitBack.controller.advance, 'NEXT ROUND')
 
   const twoPlayerSetup = await snapshot(
     bridge,
@@ -522,10 +676,11 @@ frameOverview(Player["White"])
   assert(isTrue(reset.ui.bodyActive))
   assert(isTrue(reset.ui.toolsActive), 'Overview and Status must remain available during setup.')
   assert.equal(String(reset.ui.panelHeight), '492')
+  assert.equal(reset.ui.collapseLabel, '−')
   assert.match(reset.ui.roster, /0 \/ 6 SEATED · 6 ACTIVE/)
   assert.equal(reset.refugee, 12, 'Cleanup must restore the six-player refugee counter.')
 
-  console.log('Live TTS verification passed: setup tools, 2/6-player rosters, deals, cadence, signed ending, undo, chair rotation, overview, and collapse.')
+  console.log('Live TTS verification passed: setup tools, all 2–6-player rosters, deals, native turns, console controls, both endings/undo paths, chair rotation, overview, and collapse.')
 } catch (error) {
   failure = error
   console.error(`Live TTS verification failed: ${error.message}`)

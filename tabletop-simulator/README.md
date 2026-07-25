@@ -106,4 +106,4 @@ With the generated save open in Tabletop Simulator:
 npm run tts:test:live
 ```
 
-The live test loads the generated Global/controller scripts into the open table through TTS's local external editor API, then verifies setup visibility, deterministic chair selection, counter reset, all six private deals, the full turn cadence, the guarded signed ending and undo, chair rotation, and panel collapse. It restores the open session to its setup state when complete.
+The live test loads the generated Global/controller scripts into the open table through TTS's local external editor API. It verifies every 2–6-country roster, deterministic chairs and counters, active/inactive private deals, native End Turn events, physical-console bridges, full phase cadence, both conference endings and their undo paths, chair rotation, Overview, and panel collapse. It restores the open session—including physical counters and decks—to setup when complete.
