@@ -38,7 +38,15 @@ ADVANCE_LABELS = {
     crisis = "SEAL COMMITMENT",
     summit = "END SUMMIT TURN",
     aftermath = "NEXT ROUND",
-    ended = "ENDED",
+    ended = "CONFERENCE CLOSED",
+}
+RAIL_PHASES = {"briefing", "cabinet", "crisis", "summit", "aftermath"}
+RAIL_IDS = {
+    briefing = "railBriefing",
+    cabinet = "railCabinet",
+    crisis = "railCrisis",
+    summit = "railSummit",
+    aftermath = "railAftermath",
 }
 
 GUIDS = __GUIDS__
@@ -58,6 +66,9 @@ state = {
 }
 
 syncingTurns = false
+panelCollapsed = false
+finishArmed = false
+finishArmGeneration = 0
 
 function onLoad(saved_data)
     if saved_data and saved_data ~= "" then
@@ -88,6 +99,11 @@ function normalizeState()
     state.turnIndex = math.max(1, math.min(state.playerCount, tonumber(state.turnIndex) or 1))
     if not tableContains(PHASES, state.phase) then state.phase = "briefing" end
     state.started = state.started == true
+    if state.outcome ~= "signed" and state.outcome ~= "rounds" then state.outcome = nil end
+    if not tableContains(PHASES, state.endFromPhase) or state.endFromPhase == "ended" then
+        state.endFromPhase = nil
+    end
+    state.endFromTurn = math.max(1, math.min(state.playerCount, tonumber(state.endFromTurn) or 1))
 end
 
 function tableContains(values, target)
@@ -133,7 +149,12 @@ function statusLine()
         return "Waiting for setup · " .. tostring(state.playerCount) .. " countries · dispatch " .. tostring(state.dispatchCode)
     end
     if state.phase == "ended" then
-        return "Round " .. tostring(state.round) .. " · Conference ended"
+        local ending = state.outcome == "signed" and "All delegations signed" or "Six rounds complete"
+        return "Round " .. tostring(state.round) .. "/6 · Conference ended · " .. ending
+    end
+    if not actionPhase() then
+        return "Round " .. tostring(state.round) .. "/6 · " .. PHASE_NAMES[state.phase] ..
+            " · Chair " .. COUNTRY_NAMES[chairCountry()] .. " · Table step"
     end
     return "Round " .. tostring(state.round) .. "/6 · " .. PHASE_NAMES[state.phase] ..
         " · Chair " .. COUNTRY_NAMES[chairCountry()] .. " · Active " .. COUNTRY_NAMES[activeCountry()]
@@ -181,11 +202,15 @@ function uiStartConference(player)
 end
 
 function startConference()
+    disarmFinish()
     state.started = true
     state.round = 1
     state.phase = "briefing"
     state.turnIndex = 1
     state.chairIndex = chooseFirstChair(state.dispatchCode, state.playerCount)
+    state.outcome = nil
+    state.endFromPhase = nil
+    state.endFromTurn = 1
     resetCounters()
     shufflePolicyDecks()
     local crisis_deck = getObjectFromGUID(GUIDS.crisisDeck)
@@ -226,18 +251,77 @@ function uiBack(player)
     stepBack()
 end
 
+function uiStatus(player)
+    broadcastStatus(player and player.color or nil)
+end
+
+function uiTogglePanel(player)
+    panelCollapsed = not panelCollapsed
+    applyPanelState()
+end
+
+function uiFinishConference(player)
+    if not requireControl(player) then return end
+    finishConference(player and player.color or nil)
+end
+
+function disarmFinish()
+    finishArmed = false
+    finishArmGeneration = finishArmGeneration + 1
+end
+
+function finishConference(target_color)
+    if not state.started or (state.phase ~= "summit" and state.phase ~= "aftermath") then
+        local message = "All signatures may be confirmed during the Peace Summit or Aftermath."
+        if target_color then
+            broadcastToColor(message, target_color, {0.93, 0.42, 0.36})
+        else
+            printToAll("[On War's End] " .. message, {0.93, 0.42, 0.36})
+        end
+        return
+    end
+    if not finishArmed then
+        finishArmed = true
+        finishArmGeneration = finishArmGeneration + 1
+        local generation = finishArmGeneration
+        updateUI()
+        if target_color then
+            broadcastToColor("Confirm ALL SIGNED within 5 seconds to close the conference.", target_color, {0.89, 0.76, 0.45})
+        end
+        Wait.time(function()
+            if finishArmed and finishArmGeneration == generation then
+                disarmFinish()
+                updateUI()
+            end
+        end, 5)
+        return
+    end
+    state.endFromPhase = state.phase
+    state.endFromTurn = state.turnIndex
+    state.outcome = "signed"
+    state.phase = "ended"
+    state.turnIndex = 1
+    disarmFinish()
+    updateAll()
+    broadcastToAll("[On War's End] Every active delegation has signed. The Vellan Accord is complete.", {0.55, 0.78, 0.70})
+end
+
 function advanceClock()
     if not state.started then
         printToAll("[On War's End] Choose countries and a dispatch code, then Start conference.", {0.89, 0.76, 0.45})
         return
     end
     if state.phase == "ended" then return end
+    disarmFinish()
     if state.phase == "briefing" then
         state.phase = "cabinet"
         state.turnIndex = 1
         dealPolicyHands()
     elseif state.phase == "aftermath" then
         if state.round >= 6 then
+            state.endFromPhase = "aftermath"
+            state.endFromTurn = 1
+            state.outcome = "rounds"
             state.phase = "ended"
         else
             state.round = state.round + 1
@@ -265,6 +349,7 @@ end
 
 function stepBack()
     if not state.started then return end
+    disarmFinish()
     if state.phase == "briefing" then
         if state.round <= 1 then return end
         state.round = state.round - 1
@@ -272,8 +357,11 @@ function stepBack()
         state.phase = "aftermath"
         state.turnIndex = 1
     elseif state.phase == "ended" then
-        state.phase = "aftermath"
-        state.turnIndex = 1
+        state.phase = state.endFromPhase or "aftermath"
+        state.turnIndex = state.endFromTurn or 1
+        state.outcome = nil
+        state.endFromPhase = nil
+        state.endFromTurn = 1
     elseif state.phase == "aftermath" then
         state.phase = "summit"
         state.turnIndex = state.playerCount
@@ -302,22 +390,61 @@ function updateAll()
 end
 
 function updateUI()
-    UI.setValue("roundText", state.started and ("Round " .. tostring(state.round) .. " of 6") or "Conference setup")
+    local is_setup = not state.started
+    local is_running = state.started and state.phase ~= "ended"
+    local can_finish = state.started and (state.phase == "summit" or state.phase == "aftermath")
+    UI.setValue("roundText", state.started and ("ROUND " .. tostring(state.round) .. " / 6") or "CONFERENCE SETUP")
+    UI.setValue("rosterText", tostring(state.playerCount) .. " DELEGATIONS · FIXED ROSTER")
     UI.setValue("phaseText", state.started and PHASE_NAMES[state.phase] or "Choose the delegation roster")
-    UI.setValue("activeText", state.started and
-        ("Chair: " .. COUNTRY_NAMES[chairCountry()] .. " · Active: " .. COUNTRY_NAMES[activeCountry()]) or
-        ("First " .. tostring(state.playerCount) .. " countries in the roster will play."))
+    if is_setup then
+        UI.setValue("activeText", "First " .. tostring(state.playerCount) .. " countries in the roster will play.")
+    elseif actionPhase() then
+        UI.setValue("activeText", "CHAIR  " .. COUNTRY_NAMES[chairCountry()] ..
+            "    /    ACTING  " .. COUNTRY_NAMES[activeCountry()])
+    elseif state.phase == "ended" then
+        UI.setValue("activeText", state.outcome == "signed" and
+            "ACCORD COMPLETE  /  ALL ACTIVE DELEGATIONS SIGNED" or
+            "CONFERENCE CLOSED  /  SIX ROUNDS COMPLETE")
+    else
+        UI.setValue("activeText", "CHAIR  " .. COUNTRY_NAMES[chairCountry()] .. "    /    TABLE STEP")
+    end
     UI.setValue("instructionText", state.started and INSTRUCTIONS[state.phase] or
-        "The clock automates chair order and phase cadence. Pieces and rule outcomes stay tactile.")
+        "The clock runs chair order and phase cadence. Pieces and rule outcomes stay tactile.")
     UI.setValue("advanceButton", state.started and ADVANCE_LABELS[state.phase] or "Start first")
     UI.setAttribute("playerCount", "value", state.playerCount - 2)
-    UI.setAttribute("playerCount", "interactable", not state.started)
+    UI.setAttribute("playerCount", "interactable", is_setup)
     UI.setValue("dispatchCode", tostring(state.dispatchCode))
-    UI.setAttribute("dispatchCode", "interactable", not state.started)
-    UI.setValue("startButton", state.started and "Conference underway" or "Start conference")
-    UI.setAttribute("startButton", "interactable", not state.started)
-    UI.setAttribute("advanceButton", "interactable", state.started and state.phase ~= "ended")
+    UI.setAttribute("dispatchCode", "interactable", is_setup)
+    UI.setAttribute("setupControls", "active", is_setup)
+    UI.setAttribute("startButton", "active", is_setup)
+    UI.setAttribute("advanceButton", "active", is_running)
+    UI.setAttribute("clockTools", "active", state.started)
+    UI.setAttribute("advanceButton", "interactable", is_running)
     UI.setAttribute("backButton", "interactable", state.started)
+    UI.setAttribute("finishButton", "active", can_finish)
+    UI.setValue("finishButton", finishArmed and "CONFIRM ALL SIGNED  /  CLOSE NOW" or
+        "ALL SIGNED  /  END CONFERENCE")
+    UI.setAttribute("finishButton", "colors", finishArmed and
+        "#B25345|#CD6959|#803B32|#666860" or "#704037|#925348|#522E28|#666860")
+    updatePhaseRail()
+    applyPanelState()
+end
+
+function updatePhaseRail()
+    local current = phaseIndex()
+    for index, phase in ipairs(RAIL_PHASES) do
+        local color = "#777A72"
+        if index < current then color = "#8FC0B6" end
+        if index == current then color = "#C59A4A" end
+        UI.setAttribute(RAIL_IDS[phase], "color", color)
+        UI.setAttribute(RAIL_IDS[phase], "fontStyle", index == current and "Bold" or "Normal")
+    end
+end
+
+function applyPanelState()
+    UI.setAttribute("clockBody", "active", not panelCollapsed)
+    UI.setAttribute("clockPanel", "height", panelCollapsed and "70" or "476")
+    UI.setValue("collapseButton", panelCollapsed and "+" or "−")
 end
 
 function updateMarkers()
@@ -476,13 +603,15 @@ function onChat(message, sender)
     if not message or string.sub(string.lower(message), 1, 4) ~= "!owe" then return true end
     local command = string.lower(message)
     if command == "!owe help" then
-        broadcastToColor("!owe status · !owe next · !owe back. Host/promoted players control the clock; reload the save to reset the physical table.", sender.color, {0.89, 0.76, 0.45})
+        broadcastToColor("!owe status · !owe next · !owe back · !owe finish. Host/promoted players control the clock; reload the save to reset the physical table.", sender.color, {0.89, 0.76, 0.45})
     elseif command == "!owe status" then
         broadcastStatus(sender.color)
     elseif command == "!owe next" then
         if requireControl(sender) then advanceClock() end
     elseif command == "!owe back" then
         if requireControl(sender) then stepBack() end
+    elseif command == "!owe finish" then
+        if requireControl(sender) then finishConference(sender.color) end
     else
         broadcastToColor("Unknown command. Type !owe help.", sender.color, {0.93, 0.42, 0.36})
     end

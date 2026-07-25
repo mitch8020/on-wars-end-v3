@@ -939,14 +939,14 @@ for (const country of countries) {
 
   const handPosition =
     country.position.rotation === 0
-      ? { x: country.position.x, y: 3.1, z: country.position.z - 5.2 }
-      : { x: country.position.x, y: 3.1, z: country.position.z + 5.2 }
+      ? { x: country.position.x, y: 3.1, z: country.position.z - 7 }
+      : { x: country.position.x, y: 3.1, z: country.position.z + 7 }
   const hand = baseObject({
     name: 'HandTrigger',
     nickname: `${country.name} Private Hand`,
     position: handPosition,
     rotation: { y: country.position.rotation },
-    scale: { x: 10.5, y: 5, z: 3.3 },
+    scale: { x: 8.2, y: 5, z: 2.3 },
     color: country.color,
     locked: true,
     tags: ['HandZone', `Country_${country.id}`],

@@ -11,7 +11,10 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
-    "test:e2e": "node e2e/walk-v3.mjs"
+    "test:e2e": "node e2e/walk-v3.mjs",
+    "tts:build": "node tabletop-simulator/build-mod.mjs",
+    "tts:verify": "node tabletop-simulator/verify-mod.mjs",
+    "tts:test:live": "node tabletop-simulator/live-test.mjs"
   },
   "dependencies": {
     "@fontsource-variable/source-sans-3": "^5.2.8",

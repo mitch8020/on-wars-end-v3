@@ -41,8 +41,8 @@ Policy legality, resource movement, crisis totals/results, Trust changes, exchan
 From `on-wars-end-v3`:
 
 ```powershell
-node tabletop-simulator/build-mod.mjs
-node tabletop-simulator/verify-mod.mjs
+npm run tts:build
+npm run tts:verify
 ```
 
 The build writes:
@@ -75,6 +75,9 @@ The asset references are native absolute Windows paths. They work for single-pla
 4. Reveal the top Crisis card and select **Begin Cabinet**.
 5. Use **NEXT** after the active delegation completes its move.
 6. Use **BACK** only to repair the clock. It does not undo pieces already moved.
+7. When every active delegation has moved its signature seal, use the guarded **ALL SIGNED** action twice to close the conference immediately.
+
+The conference docket can be collapsed from its upper-right control. Its numbered rail shows the current table step without replacing the physical phase marker.
 
 Hotkeys are available from **Options → Game Keys**:
 
@@ -89,6 +92,17 @@ Chat commands:
 !owe status
 !owe next
 !owe back
+!owe finish
 ```
 
 Reload the original save to reset every physical component for a new game.
+
+## Live runtime verification
+
+With the generated save open in Tabletop Simulator:
+
+```powershell
+npm run tts:test:live
+```
+
+The live test loads the generated Global/controller scripts into the open table through TTS's local external editor API, then verifies setup visibility, deterministic chair selection, counter reset, all six private deals, the full turn cadence, the guarded signed ending and undo, chair rotation, and panel collapse. It restores the open session to its setup state when complete.

@@ -31,7 +31,7 @@ assert(
   'The serialized turn system must use TTS safe disabled defaults.',
 )
 assert(typeof save.LuaScript === 'string' && save.LuaScript.length > 5000, 'Global Lua script is missing or too short.')
-assert(typeof save.XmlUI === 'string' && save.XmlUI.includes('turnPanel'), 'Global turn UI is missing.')
+assert(typeof save.XmlUI === 'string' && save.XmlUI.includes('clockPanel'), 'Global conference-clock UI is missing.')
 assert(guids.length === uniqueGuids.size, `Duplicate GUIDs found (${guids.length - uniqueGuids.size}).`)
 assert([...usedTags].every((tag) => declaredTags.has(tag)), 'One or more object tags are missing from ComponentTags.')
 assert(
@@ -66,11 +66,30 @@ assert(topWithTag('PhaseMarker').length === 1, 'Expected one phase marker.')
 assert(topByName('Custom_Board').length === 7, 'Expected one conference board and six country boards.')
 
 for (const country of countries) {
+  const countryTag = `Country_${country.id}`
   const policyDeck = topLevel.find(
-    (object) => object.Tags?.includes('PolicyDeck') && object.Tags?.includes(`Country_${country.id}`),
+    (object) => object.Tags?.includes('PolicyDeck') && object.Tags?.includes(countryTag),
   )
   assert(policyDeck?.ContainedObjects?.length === policies.length, `${country.name} policy deck is incomplete.`)
   assert(policyDeck?.DeckIDs?.length === policies.length, `${country.name} policy DeckIDs are incomplete.`)
+
+  const mandate = topLevel.find(
+    (object) => object.Tags?.includes('MandateCard') && object.Tags?.includes(countryTag),
+  )
+  const handZone = topLevel.find(
+    (object) => object.Tags?.includes('HandZone') && object.Tags?.includes(countryTag),
+  )
+  for (const component of [policyDeck, mandate]) {
+    if (!component?.Transform || !handZone?.Transform) continue
+    const distance = Math.hypot(
+      component.Transform.posX - handZone.Transform.posX,
+      component.Transform.posZ - handZone.Transform.posZ,
+    )
+    assert(
+      distance >= 5,
+      `${country.name} private hand zone overlaps ${component.Nickname ?? component.Name}.`,
+    )
+  }
 }
 
 const customAssetUrls = recursive.flatMap((object) => {
@@ -104,6 +123,8 @@ const requiredLuaFragments = [
   'Turns.order',
   'Turns.turn_color',
   'function dealPolicyHands',
+  'function finishConference',
+  'function uiTogglePanel',
 ]
 for (const fragment of requiredLuaFragments) {
   assert(save.LuaScript.includes(fragment), `Global Lua is missing ${fragment}.`)
@@ -111,6 +132,21 @@ for (const fragment of requiredLuaFragments) {
 
 for (const object of topWithTag('Controller')) {
   assert(object.LuaScript.includes('Global.call("controllerAdvance"'), 'Controller NEXT button is not wired to Global.')
+}
+
+const uiIds = [...save.XmlUI.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1])
+assert(uiIds.length === new Set(uiIds).size, 'Global UI element ids must be unique.')
+assert(save.XmlUI.includes('offsetXY="-24 -24"'), 'The conference clock must use a screen-space offset.')
+assert(!save.XmlUI.includes('position="-24 -24"'), 'The conference clock still uses the wrong 3D position attribute.')
+assert(save.XmlUI.includes('preferredHeight="54"'), 'The primary clock action is missing an explicit layout height.')
+assert(save.XmlUI.includes('id="finishButton"'), 'The guarded all-signatures action is missing.')
+assert(save.XmlUI.includes('id="collapseButton"'), 'The collapsible conference docket control is missing.')
+
+const uiHandlers = [
+  ...save.XmlUI.matchAll(/\bon(?:Click|ValueChanged|EndEdit)="([^"]+)"/g),
+].map((match) => match[1])
+for (const handler of uiHandlers) {
+  assert(save.LuaScript.includes(`function ${handler}`), `Global UI handler ${handler} is not defined in Lua.`)
 }
 
 if (errors.length > 0) {
