@@ -294,6 +294,53 @@ sendExternalMessage({
   return JSON.parse(message.customMessage.payload)
 }
 
+async function runDelayedCommand(bridge, label, prepare, complete, delaySeconds) {
+  const nonce = `delayed-${label}-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  const message = await bridge.request(
+    {
+      messageID: 3,
+      guid: GLOBAL_GUID,
+      script: `
+local scheduleOk, scheduleError = pcall(function()
+${prepare}
+    Wait.time(function()
+        local completeOk, completeError = pcall(function()
+${complete}
+        end)
+        sendExternalMessage({
+            suite = "owe-live",
+            nonce = "${nonce}",
+            delayedComplete = true,
+            ok = completeOk,
+            error = tostring(completeError),
+        })
+    end, ${delaySeconds})
+end)
+if not scheduleOk then
+    sendExternalMessage({
+        suite = "owe-live",
+        nonce = "${nonce}",
+        delayedComplete = true,
+        ok = false,
+        error = tostring(scheduleError),
+    })
+end
+`,
+    },
+    (candidate) =>
+      candidate.messageID === 4 &&
+      candidate.customMessage?.suite === 'owe-live' &&
+      candidate.customMessage?.nonce === nonce &&
+      candidate.customMessage?.delayedComplete === true,
+    Math.max(10_000, delaySeconds * 1_000 + 8_000),
+  )
+  assert.equal(
+    message.customMessage.ok,
+    true,
+    `Delayed TTS command for "${label}" failed: ${message.customMessage.error}`,
+  )
+}
+
 function isTrue(value) {
   return value === true || String(value).toLowerCase() === 'true'
 }
@@ -688,10 +735,26 @@ advanceClock()
     assert.equal(twoPlayerCabinet.decks[country], 16)
   }
 
-  const reset = await snapshot(
+  await runDelayedCommand(
     bridge,
-    'test session restores the untouched setup surface',
+    'restore the untouched setup surface',
     `
+local function restoreTestSetupState()
+    state = {
+        started = false,
+        playerCount = 6,
+        dispatchCode = 148802,
+        round = 1,
+        phase = "briefing",
+        chairIndex = 1,
+        turnIndex = 1,
+    }
+    disarmFinish()
+    panelCollapsed = false
+end
+syncingTurns = true
+Turns.enable = false
+restoreTestSetupState()
 for _, country in ipairs(COUNTRIES) do
     local deck = getObjectFromGUID(POLICY_DECKS[country])
     if deck then
@@ -704,24 +767,20 @@ end
 for _, player in ipairs(Player.getPlayers()) do
     if player.color ~= "White" then player.changeColor("White") end
 end
-state = {
-    started = false,
-    playerCount = 6,
-    dispatchCode = 148802,
-    round = 1,
-    phase = "briefing",
-    chairIndex = 1,
-    turnIndex = 1,
-}
-finishArmed = false
-panelCollapsed = false
-resetCounters()
-updateAll()
-Wait.time(function()
-    frameOverview(Player["White"])
-end, 0.5)
 `,
-    1.2,
+    `
+    restoreTestSetupState()
+    resetCounters()
+    updateAll()
+    frameOverview(Player["White"])
+`,
+    0.75,
+  )
+  const reset = await snapshot(
+    bridge,
+    'test session restores the untouched setup surface',
+    '',
+    0.4,
   )
   assert.equal(reset.state.started, false)
   assert(isTrue(reset.ui.bodyActive))
