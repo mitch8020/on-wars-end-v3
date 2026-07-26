@@ -299,10 +299,10 @@ end
 function frameOverview(player)
     if not player then return end
     player.lookAt({
-        position = {x = 0, y = 0, z = 0},
-        pitch = 62,
+        position = {x = -6, y = 0, z = 0},
+        pitch = 68,
         yaw = 180,
-        distance = 55,
+        distance = 58,
     })
 end
 

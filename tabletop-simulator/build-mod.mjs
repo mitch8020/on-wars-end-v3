@@ -649,17 +649,6 @@ function localToWorld(country, localX, localZ, y = 1.45) {
   }
 }
 
-function customBoard(filename, options) {
-  const object = baseObject({ ...options, name: 'Custom_Board', locked: true })
-  object.CustomImage = {
-    ImageURL: path.join(assetDir, filename),
-    ImageSecondaryURL: '',
-    ImageScalar: 1,
-    WidthScale: 1,
-  }
-  return object
-}
-
 function customTile(filename, options, tile = {}) {
   const object = baseObject({ ...options, name: 'Custom_Tile' })
   object.CustomImage = {
@@ -805,26 +794,36 @@ const policyDecks = {}
 const counterStarts = {}
 
 objectStates.push(
-  customBoard('conference-board.png', {
-    nickname: "The Vellan Accord — Conference Board",
-    description: 'Public Peace, Unrest, Refugee, Round, Trust, crisis, phase, and signature areas.',
-    position: { x: 0, y: 1.05, z: 0 },
-    scale: { x: 1.48, y: 1, z: 1.48 },
-    tags: ['ConferenceBoard'],
-  }),
+  customTile(
+    'conference-board.png',
+    {
+      nickname: "The Vellan Accord — Conference Board",
+      description: 'Public Peace, Unrest, Refugee, Round, Trust, crisis, phase, and signature areas.',
+      position: { x: 0, y: 1.05, z: 0 },
+      scale: { x: 11.25, y: 1, z: 11.25 },
+      locked: true,
+      tags: ['ConferenceBoard'],
+    },
+    { type: 0, thickness: 0.08, stackable: false, stretch: true },
+  ),
 )
 
 for (const country of countries) {
   objectStates.push(
-    customBoard(`mat-${country.id}.png`, {
-      nickname: `${country.name} Delegation Mat`,
-      description: `${country.epithet}. ${country.brief}`,
-      notes: JSON.stringify({ country: country.id, seatColor: country.seatColor }),
-      position: { x: country.position.x, y: 1.05, z: country.position.z },
-      rotation: { y: country.position.rotation },
-      scale: { x: 0.63, y: 1, z: 0.63 },
-      tags: ['CountryMat', `Country_${country.id}`],
-    }),
+    customTile(
+      `mat-${country.id}.png`,
+      {
+        nickname: `${country.name} Delegation Mat`,
+        description: `${country.epithet}. ${country.brief}`,
+        notes: JSON.stringify({ country: country.id, seatColor: country.seatColor }),
+        position: { x: country.position.x, y: 1.05, z: country.position.z },
+        rotation: { y: country.position.rotation },
+        scale: { x: 3.2, y: 1, z: 3.2 },
+        locked: true,
+        tags: ['CountryMat', `Country_${country.id}`],
+      },
+      { type: 0, thickness: 0.08, stackable: false, stretch: true },
+    ),
   )
 
   const policyDeck = deck({
@@ -1129,7 +1128,7 @@ const controller = customTile(
   {
     nickname: 'Conference Clock Console',
     description: 'Scripted physical controls for advancing, reversing, and reporting the conference clock.',
-    position: { x: 0, y: 1.25, z: -11 },
+    position: { x: 0, y: 1.25, z: -9.6 },
     scale: { x: 1.28, y: 1, z: 1.28 },
     locked: true,
     tags: ['Controller'],
@@ -1159,7 +1158,7 @@ objectStates.push(
 const turnMarkerPositions = Object.fromEntries(
   countries.map((country) => [
     country.id,
-    localToWorld(country, 0, 3.35, 1.7),
+    localToWorld(country, 0, 2.55, 1.7),
   ]),
 )
 const phaseMarkerPositions = {

@@ -14,7 +14,7 @@ export const countries = [
     military: 5,
     color: '#79a9d3',
     seatColor: 'Blue',
-    position: { x: -20, z: -16, rotation: 0 },
+    position: { x: -13, z: -15, rotation: 0 },
   },
   {
     id: 'tomerin',
@@ -31,7 +31,7 @@ export const countries = [
     military: 5,
     color: '#d98a52',
     seatColor: 'Red',
-    position: { x: 0, z: -20, rotation: 0 },
+    position: { x: 0, z: -15, rotation: 0 },
   },
   {
     id: 'veyra',
@@ -48,7 +48,7 @@ export const countries = [
     military: 4,
     color: '#a8b96b',
     seatColor: 'Green',
-    position: { x: 20, z: -16, rotation: 0 },
+    position: { x: 13, z: -15, rotation: 0 },
   },
   {
     id: 'karsk',
@@ -65,7 +65,7 @@ export const countries = [
     military: 7,
     color: '#c86c67',
     seatColor: 'Yellow',
-    position: { x: 20, z: 16, rotation: 180 },
+    position: { x: 13, z: 15, rotation: 180 },
   },
   {
     id: 'belovar',
@@ -82,7 +82,7 @@ export const countries = [
     military: 5,
     color: '#b89ad2',
     seatColor: 'Purple',
-    position: { x: 0, z: 20, rotation: 180 },
+    position: { x: 0, z: 15, rotation: 180 },
   },
   {
     id: 'namarra',
@@ -99,7 +99,7 @@ export const countries = [
     military: 4,
     color: '#63b4aa',
     seatColor: 'Teal',
-    position: { x: -20, z: 16, rotation: 180 },
+    position: { x: -13, z: 15, rotation: 180 },
   },
 ]
 export const resources = [

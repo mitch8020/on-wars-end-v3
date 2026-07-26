@@ -685,7 +685,9 @@ finishArmed = false
 panelCollapsed = false
 resetCounters()
 updateAll()
-frameOverview(Player["White"])
+Wait.time(function()
+    frameOverview(Player["White"])
+end, 0.5)
 `,
     1.2,
   )

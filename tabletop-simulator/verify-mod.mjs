@@ -85,10 +85,18 @@ assert(topWithTag('HandZone').length === countries.length, 'Expected six private
 assert(topWithTag('Controller').length === 1, 'Expected one physical conference console.')
 assert(topWithTag('TurnMarker').length === 1, 'Expected one active delegation marker.')
 assert(topWithTag('PhaseMarker').length === 1, 'Expected one phase marker.')
-assert(topByName('Custom_Board').length === 7, 'Expected one conference board and six country boards.')
+assert(topByName('Custom_Board').length === 0, 'Framed custom boards reintroduce oversized colliders.')
+
+const conferenceBoard = topWithTag('ConferenceBoard')[0]
+assert(conferenceBoard?.Name === 'Custom_Tile', 'The conference surface must use a low-profile custom tile.')
+assert(
+  conferenceBoard?.Transform?.scaleX === 11.25 && conferenceBoard?.Transform?.scaleZ === 11.25,
+  'The conference surface is not calibrated to the compact table layout.',
+)
 
 for (const country of countries) {
   const countryTag = `Country_${country.id}`
+  const countryMat = topWithTag('CountryMat').find((object) => object.Tags?.includes(countryTag))
   const policyDeck = topLevel.find(
     (object) => object.Tags?.includes('PolicyDeck') && object.Tags?.includes(countryTag),
   )
@@ -101,6 +109,16 @@ for (const country of countries) {
   const handZone = topLevel.find(
     (object) => object.Tags?.includes('HandZone') && object.Tags?.includes(countryTag),
   )
+  assert(countryMat?.Name === 'Custom_Tile', `${country.name} mat must use a low-profile custom tile.`)
+  assert(
+    countryMat?.Transform?.posX === country.position.x &&
+      countryMat?.Transform?.posZ === country.position.z &&
+      countryMat?.Transform?.scaleX === 3.2 &&
+      countryMat?.Transform?.scaleZ === 3.2,
+    `${country.name} mat is not calibrated to the compact delegation row.`,
+  )
+  const boardGap = Math.abs(country.position.z) - 11.25 - 3.2
+  assert(boardGap >= 0.5, `${country.name} mat overlaps the central conference surface.`)
   for (const component of [policyDeck, mandate]) {
     if (!component?.Transform || !handZone?.Transform) continue
     const distance = Math.hypot(
@@ -111,6 +129,14 @@ for (const country of countries) {
       distance >= 5,
       `${country.name} private hand zone overlaps ${component.Nickname ?? component.Name}.`,
     )
+  }
+}
+
+for (const rowZ of [-15, 15]) {
+  const row = countries.filter((country) => country.position.z === rowZ).sort((left, right) => left.position.x - right.position.x)
+  for (let index = 1; index < row.length; index += 1) {
+    const horizontalGap = row[index].position.x - row[index - 1].position.x - 2 * 3.2 * (16 / 9)
+    assert(horizontalGap >= 0.5, `${row[index - 1].name} and ${row[index].name} mats overlap.`)
   }
 }
 
@@ -167,10 +193,17 @@ assert(save.XmlUI.includes('id="activeText"') && save.XmlUI.includes('preferredH
 assert(save.XmlUI.includes('id="finishButton"'), 'The guarded all-signatures action is missing.')
 assert(save.XmlUI.includes('id="collapseButton"'), 'The collapsible conference docket control is missing.')
 assert(save.XmlUI.includes('id="overviewButton"'), 'The per-player table overview control is missing.')
+assert(save.XmlUI.includes('>UNDO CLOCK</Button>'), 'The clock-repair action needs an unambiguous label.')
 assert(save.LuaScript.includes('UI.setAttribute("advanceButton", "text"'), 'The rendered primary-action label is not updated.')
 assert(save.LuaScript.includes('UI.setAttribute("finishButton", "text"'), 'The rendered finish-confirmation label is not updated.')
 assert(save.LuaScript.includes('UI.setAttribute("collapseButton", "text"'), 'The rendered collapse label is not updated.')
 assert(!save.LuaScript.includes('UI.setValue("advanceButton"'), 'Button labels must use the rendered text attribute.')
+assert(
+  save.LuaScript.includes('position = {x = -6, y = 0, z = 0}') &&
+    save.LuaScript.includes('pitch = 68') &&
+    save.LuaScript.includes('distance = 58'),
+  'The overview camera is not calibrated for the compact table and conference docket.',
+)
 
 const uiHandlers = [
   ...save.XmlUI.matchAll(/\bon(?:Click|ValueChanged|EndEdit)="([^"]+)"/g),

@@ -135,9 +135,9 @@ KARSK · BELOVAR · NAMARRA</Text>
           <Button id="backButton"
                   onClick="uiBack"
                   fontSize="14"
-                  tooltip="Repair the clock only; physical pieces are not undone"
+                  tooltip="Restore the previous clock state; physical pieces are not moved"
                   colors="#3B3E39|#4C5049|#2A2C28|#666860"
-                  textColor="#F2E8D1">BACK / CLOCK</Button>
+                  textColor="#F2E8D1">UNDO CLOCK</Button>
           <Button id="statusButton"
                   onClick="uiStatus"
                   fontSize="14"
