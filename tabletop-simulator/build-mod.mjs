@@ -4,15 +4,31 @@ import {
   readFile,
   writeFile,
 } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { countries, crises, phases, policies, resources } from './content.mjs'
+import { hostGuide, privateDossier, publicRules } from './notebook.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const projectRoot = path.dirname(here)
 const assetDir = path.join(here, 'assets')
 const distDir = path.join(here, 'dist')
 const sourceDir = path.join(here, 'src')
+const generatedAssetNames = [
+  'conference-board.png',
+  ...countries.map((country) => `mat-${country.id}.png`),
+  'policy-sheet.png',
+  'policy-back.png',
+  'crisis-sheet.png',
+  'crisis-back.png',
+  'mandate-sheet.png',
+  'mandate-back.png',
+  'red-line-sheet.png',
+  'red-line-back.png',
+  'quick-reference.png',
+  'controller.png',
+  'cover.png',
+]
 const ttsSeatColors = {
   Blue: { r: 0.117999978, g: 0.53, b: 1, a: 0 },
   Red: { r: 0.856, g: 0.09999997, b: 0.09399996, a: 0 },
@@ -113,6 +129,17 @@ const boardBody = `
             ${resources.map((resource) => `<span style="--piece:${resource.color}">${resource.short}</span>`).join('')}
             <span style="--piece:#7d554a">MIL</span>
           </div>
+          <div class="commitment-lanes">
+            ${countries
+              .map(
+                (country) => `
+                  <div style="--country:${country.color}">
+                    <b>${country.monogram}</b>
+                    <span>SEALED → REVEAL</span>
+                  </div>`,
+              )
+              .join('')}
+          </div>
         </div>
       </section>
       <section class="accord">
@@ -132,9 +159,20 @@ const boardBody = `
             )
             .join('')}
         </div>
-        <div class="summit-note">
-          <b>SUMMIT MOVES</b>
-          <span>Sign · Accept · Post · Backchannel · Pass</span>
+        <div class="proposal-board">
+          <b>PUBLIC PROPOSALS · CLEAR IN AFTERMATH</b>
+          <div>
+            ${countries
+              .map(
+                (country) => `
+                  <span style="--country:${country.color}">
+                    <strong>${country.monogram}</strong>
+                    <i>GIVE</i>
+                    <i>WANT</i>
+                  </span>`,
+              )
+              .join('')}
+          </div>
         </div>
       </section>
       <section class="trust-ledger">
@@ -233,6 +271,13 @@ await renderAsset(
       width: 82px; height: 82px; display: grid; place-items: center; border-radius: 12px;
       background: var(--piece); color: white; font-size: 23px; font-weight: 900; box-shadow: inset 0 0 0 4px rgba(0,0,0,.18);
     }
+    .commitment-lanes { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:24px; }
+    .commitment-lanes div {
+      min-height:76px; border:3px solid var(--country); background:rgba(255,255,255,.28);
+      display:flex; align-items:center; justify-content:space-between; padding:9px 14px;
+    }
+    .commitment-lanes b { font-size:21px; }
+    .commitment-lanes span { font-size:15px; font-weight:800; letter-spacing:.08em; }
     .accord { position: relative; display: grid; place-items: center; }
     .seal {
       width: 820px; height: 820px; border-radius: 50%;
@@ -252,10 +297,22 @@ await renderAsset(
     }
     .signature-0 { left: 12%; top: 23%; } .signature-1 { left: 43%; top: 5%; }
     .signature-2 { right: 12%; top: 23%; } .signature-3 { right: 12%; bottom: 25%; }
-    .signature-4 { left: 43%; bottom: 7%; } .signature-5 { left: 12%; bottom: 25%; }
-    .summit-note { position: absolute; bottom: 70px; text-align: center; display: grid; gap: 8px; }
-    .summit-note b { font-size: 27px; letter-spacing: .15em; }
-    .summit-note span { font-size: 22px; }
+    .signature-4 { left: 43%; bottom: 22%; } .signature-5 { left: 12%; bottom: 25%; }
+    .proposal-board {
+      position:absolute; left:1%; right:1%; bottom:24px; text-align:center;
+      display:grid; gap:12px;
+    }
+    .proposal-board > b { font-size:19px; letter-spacing:.12em; }
+    .proposal-board > div { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+    .proposal-board span {
+      min-height:96px; padding:8px; border:3px solid var(--country); background:rgba(255,255,255,.38);
+      display:grid; grid-template-columns:56px 1fr 1fr; align-items:center; gap:6px;
+    }
+    .proposal-board strong { font-size:20px; }
+    .proposal-board i {
+      height:68px; border:2px dashed #6f604c; display:grid; place-items:center;
+      font-size:14px; font-style:normal; font-weight:900; letter-spacing:.08em;
+    }
     .trust-ledger p { font-size: 21px; margin: -8px 0 22px; }
     .trust-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px 12px; }
     .trust-pair { height: 195px; border: 3px solid #746249; padding: 18px 10px; display: grid; align-content: space-between; text-align: center; background: rgba(255,255,255,.22); }
@@ -298,7 +355,7 @@ for (const country of countries) {
         <section class="lower">
           <div class="policy">
             <div><b>CABINET DECK</b><span>Draw 3 each round</span></div>
-            <div><b>PRIVATE MANDATE</b><span>Keep face-down or in hand</span></div>
+            <div><b>MANDATE REVEAL</b><span>Move here face-up only when revealed</span></div>
           </div>
           <div class="national">
             <div><b>POPULATION</b><strong>${country.population}</strong></div>
@@ -406,26 +463,34 @@ function mandateCard(country) {
         <div>${country.monogram}</div>
         <span><b>${country.name}</b><small>${escapeHtml(country.epithet)}</small></span>
       </div>
-      <div class="private">PRIVATE NATIONAL BRIEF</div>
+      <div class="private">PRIVATE NATIONAL MANDATE</div>
       <h2 class="serif">${escapeHtml(country.mandateTitle)}</h2>
       <section>
         <b>MANDATE</b>
         <p>${escapeHtml(country.mandate)}</p>
       </section>
-      <section class="redline">
-        <b>RED LINE</b>
-        <p>${escapeHtml(country.redLine)}</p>
-      </section>
-      <footer>Crossing the line creates Pressure and +1 Global Unrest the first time.</footer>
+      <footer>When revealed, move this card from your hand to the printed MANDATE REVEAL space face up. Keep the Red Line private.</footer>
     </article>`
 }
 
-await renderAsset(
-  'mandate-sheet.png',
-  3072,
-  2048,
-  `<main class="sheet mandate-sheet">${countries.map(mandateCard).join('')}</main>`,
-  `
+function redLineCard(country) {
+  return `
+    <article class="card redline-card" style="--country:${country.color}">
+      <div class="country-head">
+        <div>${country.monogram}</div>
+        <span><b>${country.name}</b><small>${escapeHtml(country.epithet)}</small></span>
+      </div>
+      <div class="private">PRIVATE RED LINE</div>
+      <h2 class="serif">${escapeHtml(country.pressure)}</h2>
+      <section>
+        <b>RED LINE</b>
+        <p>${escapeHtml(country.redLine)}</p>
+      </section>
+      <footer>Never reveal for a mandate effect. Each safe-to-unsafe crossing creates Pressure and +1 Global Unrest.</footer>
+    </article>`
+}
+
+const privateCardCss = `
     .sheet { width:100%; height:100%; display:grid; grid-template-columns:repeat(3,1fr); grid-template-rows:repeat(2,1fr); }
     .card { position:relative; overflow:hidden; padding:48px; border:15px solid #eadfc5; box-shadow:inset 0 0 0 8px #41382c; background:linear-gradient(145deg,#f3e8ce,#d8c29a); }
     .card:before { content:""; position:absolute; inset:0 0 auto; height:25px; background:var(--country); }
@@ -439,9 +504,24 @@ await renderAsset(
     section { border-top:3px solid #61503a; padding-top:22px; margin-top:24px; }
     section b { font-size:21px; letter-spacing:.15em; }
     section p { font-size:30px; line-height:1.3; margin:12px 0 0; }
-    .redline { color:#8a3f38; }
+    .redline-card section { color:#8a3f38; }
     footer { position:absolute; left:48px; right:48px; bottom:42px; font-size:18px; line-height:1.3; }
-  `,
+  `
+
+await renderAsset(
+  'mandate-sheet.png',
+  3072,
+  2048,
+  `<main class="sheet mandate-sheet">${countries.map(mandateCard).join('')}</main>`,
+  privateCardCss,
+)
+
+await renderAsset(
+  'red-line-sheet.png',
+  3072,
+  2048,
+  `<main class="sheet redline-sheet">${countries.map(redLineCard).join('')}</main>`,
+  privateCardCss,
 )
 
 async function renderBack(filename, eyebrow, title, subtitle, accent) {
@@ -474,7 +554,8 @@ async function renderBack(filename, eyebrow, title, subtitle, accent) {
 
 await renderBack('policy-back.png', 'Cabinet dispatch', 'State Policy', 'One consequential decision before the crisis council.', '#b68751')
 await renderBack('crisis-back.png', 'Regional emergency', 'Crisis Briefing', 'The table survives together—or not at all.', '#a45e4f')
-await renderBack('mandate-back.png', 'Eyes only', 'National Mandate', 'Private political terms for a survivable peace.', '#6f948c')
+await renderBack('mandate-back.png', 'Eyes only', 'National Mandate', 'When revealed, move this card from your hand to the printed mat space face up.', '#6f948c')
+await renderBack('red-line-back.png', 'Eyes only', 'National Red Line', 'This card remains private when a mandate is revealed.', '#9a5549')
 
 await renderAsset(
   'quick-reference.png',
@@ -487,9 +568,25 @@ await renderAsset(
         <h1 class="serif">A round at the Vellan table</h1>
       </div>
       <section class="steps">
-        <article><b>1 · CABINET</b><p>Each country plays one legal policy or Conserves Resources for +1 Capital.</p></article>
-        <article><b>2 · CRISIS</b><p>Chair first. Spend a sealed whole-number commitment. Resolve after everyone commits.</p></article>
-        <article><b>3 · SUMMIT</b><p>Sign, accept/post a one-for-one exchange, spend 1 Capital on a backchannel, or pass.</p></article>
+        <article>
+          <b>1 · CABINET</b>
+          <p>Each country plays one legal policy or Conserves Resources for +1 Capital.</p>
+          <ul><li>Chair first, then clockwise.</li><li>Pay every cost; apply every printed effect.</li><li>Signed countries still take turns.</li></ul>
+        </article>
+        <article>
+          <b>2 · CRISIS</b>
+          <p>Seal pieces in your hand. Reveal into your labeled lane after everyone commits.</p>
+          <ul><li>Responsible share = max(1, floor(0.6 × total required ÷ active countries)).</li><li>Two who meet it: +1 Trust.</li><li>Exactly one contributes zero: −1 Trust.</li></ul>
+        </article>
+        <article>
+          <b>3 · SUMMIT</b>
+          <p>Sign (+1 Peace), accept/post a one-for-one exchange, open a backchannel, or pass.</p>
+          <ul><li>Accept: exchange resources, +1 Trust, +1 Peace.</li><li>Backchannel: spend 1 Capital, +2 Trust, move mandate to its mat face up, +1 Peace.</li><li>Clear open proposals in Aftermath.</li></ul>
+        </article>
+      </section>
+      <section class="protocols">
+        <div><b>SEALED COMMITMENT</b><span>Spend held cubes. For Military, reduce its counter and stage brown proxies. Return cubes/proxies after resolution; Military stays reduced.</span></div>
+        <div><b>PUBLIC PROPOSAL</b><span>Place your offered cube on GIVE and a supply proxy on WANT. On acceptance, give a real requested cube and return the WANT proxy.</span></div>
       </section>
       <section class="locks">
         <h2>Four locks before a signature</h2>
@@ -503,19 +600,25 @@ await renderAsset(
     </main>`,
   `
     body { padding:34px; background:#1f1b16; }
-    .reference { height:100%; padding:48px 58px; border:10px double #6b563b; background:linear-gradient(135deg,#f2e7cd,#dac49c); display:grid; grid-template-rows:auto 1fr auto auto auto; gap:28px; }
-    h1 { font-size:64px; margin:10px 0 0; }
+    .reference { height:100%; padding:42px 52px; border:10px double #6b563b; background:linear-gradient(135deg,#f2e7cd,#dac49c); display:grid; grid-template-rows:auto 1fr auto auto auto auto; gap:20px; }
+    h1 { font-size:59px; margin:8px 0 0; }
     .steps { display:grid; grid-template-columns:repeat(3,1fr); gap:24px; }
-    article { border-top:8px solid #6a5540; padding:25px; background:rgba(255,255,255,.2); }
-    article b { font-size:25px; letter-spacing:.1em; }
-    article p { font-size:25px; line-height:1.4; }
-    .locks { border:4px solid #55766f; padding:25px; }
-    .locks h2 { margin:0 0 20px; font-size:30px; }
+    article { border-top:8px solid #6a5540; padding:21px; background:rgba(255,255,255,.2); }
+    article b { font-size:23px; letter-spacing:.1em; }
+    article p { font-size:21px; line-height:1.34; }
+    article ul { margin:18px 0 0; padding-left:24px; font-size:18px; line-height:1.42; }
+    article li + li { margin-top:8px; }
+    .protocols { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+    .protocols div { border:3px solid #76564c; padding:15px 18px; display:grid; gap:7px; }
+    .protocols b { font-size:19px; letter-spacing:.1em; color:#76564c; }
+    .protocols span { font-size:17px; line-height:1.3; }
+    .locks { border:4px solid #55766f; padding:20px; }
+    .locks h2 { margin:0 0 15px; font-size:27px; }
     .locks div { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
-    .locks span { padding:18px; background:#55766f; color:white; text-align:center; font-size:20px; font-weight:900; }
-    .loss { display:flex; gap:28px; align-items:center; color:#8a433b; border-top:4px solid currentColor; padding-top:20px; }
-    .loss b { font-size:25px; white-space:nowrap; } .loss p { font-size:22px; margin:0; }
-    footer { font-size:18px; opacity:.72; }
+    .locks span { padding:14px; background:#55766f; color:white; text-align:center; font-size:18px; font-weight:900; }
+    .loss { display:flex; gap:24px; align-items:center; color:#8a433b; border-top:4px solid currentColor; padding-top:16px; }
+    .loss b { font-size:23px; white-space:nowrap; } .loss p { font-size:20px; margin:0; }
+    footer { font-size:17px; opacity:.76; }
   `,
 )
 
@@ -561,6 +664,46 @@ await renderAsset(
 )
 
 await browser.close()
+
+async function hashFiles(files) {
+  const hash = createHash('sha256')
+  for (const [label, filename] of files) {
+    hash.update(label)
+    hash.update('\0')
+    hash.update(await readFile(filename))
+    hash.update('\0')
+  }
+  return hash.digest('hex')
+}
+
+async function hashFile(filename) {
+  return createHash('sha256').update(await readFile(filename)).digest('hex')
+}
+
+function hashArtifactInventory(assetHashes, counts) {
+  const orderedInventory = {
+    assetSha256: generatedAssetNames.map((filename) => [filename, assetHashes[filename]]),
+    counts,
+  }
+  return createHash('sha256').update(JSON.stringify(orderedInventory)).digest('hex')
+}
+
+const buildFingerprint = await hashFiles([
+  ['build-mod.mjs', fileURLToPath(import.meta.url)],
+  ['content.mjs', path.join(here, 'content.mjs')],
+  ['notebook.mjs', path.join(here, 'notebook.mjs')],
+  ['src/global.lua', path.join(sourceDir, 'global.lua')],
+  ['src/controller.lua', path.join(sourceDir, 'controller.lua')],
+  ['src/global.xml', path.join(sourceDir, 'global.xml')],
+])
+const assetSha256 = Object.fromEntries(
+  await Promise.all(
+    generatedAssetNames.map(async (filename) => [
+      filename,
+      await hashFile(path.join(assetDir, filename)),
+    ]),
+  ),
+)
 
 let guidCounter = 0xa10000
 function guid() {
@@ -799,6 +942,11 @@ objectStates.push(
     {
       nickname: "The Vellan Accord — Conference Board",
       description: 'Public Peace, Unrest, Refugee, Round, Trust, crisis, phase, and signature areas.',
+      notes: JSON.stringify({
+        type: 'conference-board',
+        buildFingerprint,
+        assetSha256: assetSha256['conference-board.png'],
+      }),
       position: { x: 0, y: 1.05, z: 0 },
       scale: { x: 11.25, y: 1, z: 11.25 },
       locked: true,
@@ -828,7 +976,8 @@ for (const country of countries) {
 
   const policyDeck = deck({
     nickname: `${country.name} Cabinet Policy Deck`,
-    description: 'Shuffle and draw three at the start of each round. Play one, or Conserve Resources.',
+    description:
+      'A fresh hand of three is dealt when Cabinet opens each round. Play one, or Conserve Resources.',
     position: localToWorld(country, -4.1, -1.55, 1.55),
     rotation: { y: country.position.rotation + 180, z: 180 },
     scale: { x: 0.82, y: 1, z: 0.82 },
@@ -850,11 +999,12 @@ for (const country of countries) {
   policyDecks[country.id] = policyDeck.GUID
   objectStates.push(policyDeck)
 
-  const mandatePosition = localToWorld(country, -0.2, -1.65, 1.5)
+  const mandatePosition = localToWorld(country, -1.35, -1.65, 1.5)
+  const redLinePosition = localToWorld(country, 1.15, -1.65, 1.5)
   objectStates.push(
     customCard({
       nickname: `${country.name} — Private National Mandate`,
-      description: `${country.mandateTitle}\nMANDATE: ${country.mandate}\nRED LINE: ${country.redLine}`,
+      description: `${country.mandateTitle}\nMANDATE: ${country.mandate}\nWhen revealed, move this card from the private hand to the printed MANDATE REVEAL space face up.`,
       position: mandatePosition,
       rotation: { y: country.position.rotation + 180, z: 180 },
       scale: { x: 0.82, y: 1, z: 0.82 },
@@ -866,6 +1016,27 @@ for (const country of countries) {
       height: 2,
       tags: ['MandateCard', `Country_${country.id}`],
       notes: { type: 'mandate', country: country.id },
+    }),
+    customCard({
+      nickname: `${country.name} — Private National Red Line`,
+      description: `RED LINE: ${country.redLine}\nThis remains private when a rule effect reveals the mandate.`,
+      position: redLinePosition,
+      rotation: { y: country.position.rotation + 180, z: 180 },
+      scale: { x: 0.82, y: 1, z: 0.82 },
+      face: 'red-line-sheet.png',
+      back: 'red-line-back.png',
+      deckKey: 400,
+      cardIndex: countries.indexOf(country),
+      width: 3,
+      height: 2,
+      tags: ['RedLineCard', `Country_${country.id}`],
+      notes: {
+        type: 'red-line',
+        country: country.id,
+        buildFingerprint,
+        faceSha256: assetSha256['red-line-sheet.png'],
+        backSha256: assetSha256['red-line-back.png'],
+      },
     }),
   )
 
@@ -904,7 +1075,7 @@ for (const country of countries) {
   objectStates.push(
     checker({
       nickname: `${country.name} Signature Seal`,
-      description: 'Move this seal to the Vellan Accord only when all four signing locks are open.',
+      description: 'Sign only when the mandate is met, the red line is safe and Pressure is cleared, Peace is at least 6, and average Trust is at least 2.0. Move this seal to the Accord and gain 1 Peace.',
       position: localToWorld(country, 4.25, 1.55, 1.45),
       scale: { x: 0.68, y: 0.68, z: 0.68 },
       color: '#d6ad56',
@@ -914,7 +1085,7 @@ for (const country of countries) {
     checker(
       {
         nickname: `${country.name} Pressure Marker`,
-        description: 'Place on the mat when the red line is crossed. Raise Global Unrest by 1 the first time.',
+        description: 'Place when the red line changes from safe to unsafe and raise Global Unrest by 1. Clear when safe; each later safe-to-unsafe recrossing repeats the penalty.',
         position: localToWorld(country, 3.25, 1.55, 1.45),
         scale: { x: 0.58, y: 0.58, z: 0.58 },
         color: '#a94138',
@@ -937,8 +1108,9 @@ for (const country of countries) {
         rotation: { y: country.position.rotation },
         scale: { x: 0.38, y: 0.38, z: 0.38 },
         color: resource.color,
+        hands: true,
         value: 1,
-        tags: ['ResourceCube', `Resource_${resource.id}`, `Country_${country.id}`],
+        tags: ['ResourceCube', `Resource_${resource.id}`, `Country_${country.id}`, 'HandEligible'],
       })
       objectStates.push(piece)
     }
@@ -955,7 +1127,7 @@ for (const country of countries) {
     rotation: { y: country.position.rotation },
     scale: { x: 8.2, y: 5, z: 2.3 },
     locked: true,
-    tags: ['HandZone', `Country_${country.id}`],
+    tags: ['HandZone', `Country_${country.id}`, 'HandEligible'],
   })
   hand.ColorDiffuse = { ...ttsSeatColors[country.seatColor] }
   hand.FogColor = country.seatColor
@@ -994,8 +1166,9 @@ for (const [index, resource] of resources.entries()) {
     position: { x: -16.7, y: 2.2, z: -5.4 + index * 3.6 },
     scale: { x: 0.38, y: 0.38, z: 0.38 },
     color: resource.color,
+    hands: true,
     value: 1,
-    tags: ['ResourceCube', `Resource_${resource.id}`, 'SupplyPiece'],
+    tags: ['ResourceCube', `Resource_${resource.id}`, 'SupplyPiece', 'HandEligible'],
   })
   const bag = infiniteBag(
     {
@@ -1011,6 +1184,32 @@ for (const [index, resource] of resources.entries()) {
   )
   objectStates.push(bag)
 }
+
+const militaryCommitmentProxy = block({
+  nickname: 'Military Commitment Proxy',
+  description: 'For a sealed Crisis commitment only. Leave at least 1 Military: reduce your national counter immediately, stage one proxy per committed Military, then return every proxy after resolution.',
+  notes: JSON.stringify({ type: 'commitment-proxy', resource: 'military' }),
+  position: { x: -16.7, y: 2.2, z: 9 },
+  scale: { x: 0.38, y: 0.38, z: 0.38 },
+  color: '#7d554a',
+  hands: true,
+  value: 1,
+  tags: ['MilitaryCommitment', 'CommitmentProxy', 'SupplyPiece', 'HandEligible'],
+})
+objectStates.push(
+  infiniteBag(
+    {
+      nickname: 'Infinite Military Commitment Proxies',
+      description: 'Leave at least 1 Military. Reduce the national counter first, then use these brown proxies to seal and reveal the commitment. These are not Military units and never enter a national reserve.',
+      position: { x: -16.7, y: 1.3, z: 9 },
+      scale: { x: 0.72, y: 0.72, z: 0.72 },
+      color: '#5e3f36',
+      locked: true,
+      tags: ['MilitarySupply', 'CommitmentProxySupply'],
+    },
+    militaryCommitmentProxy,
+  ),
+)
 
 const peaceCounter = counter(
   {
@@ -1192,12 +1391,23 @@ globalLua = globalLua
   .replace('__COUNTER_STARTS__', toLua(counterStarts))
 
 const globalXml = await readFile(path.join(sourceDir, 'global.xml'), 'utf8')
-const completeRules = await readFile(path.join(projectRoot, 'RULES.md'), 'utf8')
 const epoch = Math.floor(Date.now() / 1000)
 const recursiveObjectStates = (objects) =>
   objects.flatMap((object) => [object, ...recursiveObjectStates(object.ContainedObjects ?? [])])
+const recursiveObjects = recursiveObjectStates(objectStates)
+const artifactCounts = {
+  topLevelObjects: objectStates.length,
+  recursiveObjects: recursiveObjects.length,
+}
+const artifactFingerprint = hashArtifactInventory(assetSha256, artifactCounts)
+const conferenceBoardState = objectStates.find((object) => object.Tags?.includes('ConferenceBoard'))
+if (!conferenceBoardState) throw new Error('Generated conference board is missing.')
+conferenceBoardState.GMNotes = JSON.stringify({
+  ...JSON.parse(conferenceBoardState.GMNotes || '{}'),
+  artifactFingerprint,
+})
 const componentTagLabels = [
-  ...new Set(recursiveObjectStates(objectStates).flatMap((object) => object.Tags ?? [])),
+  ...new Set(recursiveObjects.flatMap((object) => object.Tags ?? [])),
 ]
   .sort((left, right) => left.localeCompare(right))
   .map((displayed) => ({
@@ -1218,17 +1428,23 @@ const notebookColors = [
   ['Pink', { r: 0.96, g: 0.439, b: 0.807 }],
   ['Black', { r: 0.25, g: 0.25, b: 0.25 }],
 ]
+const countryBySeatColor = new Map(countries.map((country) => [country.seatColor, country]))
 const tabStates = Object.fromEntries(
-  notebookColors.map(([color, visibleColor], id) => [
-    id,
-    {
-      title: id === 0 ? 'Rules' : color,
-      body: id === 0 ? completeRules : '',
-      color,
-      visibleColor,
+  notebookColors.map(([color, visibleColor], id) => {
+    const country = countryBySeatColor.get(color)
+    const isPublic = color === 'Grey'
+    const isHost = color === 'White'
+    return [
       id,
-    },
-  ]),
+      {
+        title: isPublic ? 'TTS Rules' : isHost ? 'Host Guide' : country ? `${country.name} — Private` : color,
+        body: isPublic ? publicRules : isHost ? hostGuide : country ? privateDossier(country) : '',
+        color,
+        visibleColor,
+        id,
+      },
+    ]
+  }),
 )
 
 const save = {
@@ -1304,19 +1520,10 @@ await writeFile(
     {
       name: save.SaveName,
       generatedAt: new Date().toISOString(),
-      assets: [
-        'conference-board.png',
-        ...countries.map((country) => `mat-${country.id}.png`),
-        'policy-sheet.png',
-        'policy-back.png',
-        'crisis-sheet.png',
-        'crisis-back.png',
-        'mandate-sheet.png',
-        'mandate-back.png',
-        'quick-reference.png',
-        'controller.png',
-        'cover.png',
-      ],
+      buildFingerprint,
+      artifactFingerprint,
+      assets: generatedAssetNames,
+      assetSha256,
       counts: {
         countries: countries.length,
         startingResourceCubes: countries.reduce(
@@ -1326,8 +1533,9 @@ await writeFile(
         policyCards: policies.length * countries.length,
         crisisCards: crises.length,
         mandateCards: countries.length,
+        redLineCards: countries.length,
         trustPairs: trustPairs.length,
-        topLevelObjects: objectStates.length,
+        ...artifactCounts,
       },
     },
     null,

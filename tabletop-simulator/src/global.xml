@@ -1,6 +1,6 @@
 <Panel id="clockPanel"
        width="516"
-       height="492"
+       height="504"
        rectAlignment="UpperRight"
        offsetXY="-24 -24"
        color="#171816F4"
@@ -25,7 +25,7 @@
               textColor="#E8D6A7">−</Button>
     </HorizontalLayout>
 
-    <Panel id="clockBody" preferredHeight="414" color="#00000000">
+    <Panel id="clockBody" preferredHeight="426" color="#00000000">
       <VerticalLayout spacing="8" childForceExpandWidth="true" childForceExpandHeight="false">
         <HorizontalLayout preferredHeight="26" spacing="10" childForceExpandHeight="true">
           <Text id="roundText"
@@ -68,7 +68,7 @@
               verticalOverflow="Overflow">ARAVELL · TOMERIN · VEYRA
 KARSK · BELOVAR · NAMARRA</Text>
         <Text id="instructionText"
-              preferredHeight="54"
+              preferredHeight="64"
               fontSize="16"
               color="#D0CCC1"
               alignment="UpperLeft"
@@ -113,7 +113,7 @@ KARSK · BELOVAR · NAMARRA</Text>
                 onClick="uiStartConference"
                 fontSize="19"
                 fontStyle="Bold"
-                tooltip="Reset public counters, shuffle decks, and choose the first chair"
+                tooltip="Open on an untouched original table. This is not a full physical reset."
                 colors="#5B8A81|#70A89D|#43665F|#666860"
                 textColor="#FFFFFF">OPEN THE CONFERENCE</Button>
 

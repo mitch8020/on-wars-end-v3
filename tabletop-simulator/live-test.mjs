@@ -409,7 +409,10 @@ updateAll()
   assert(isFalse(waiting.ui.advanceActive), 'Setup must hide the advance action.')
   assert.equal(waiting.ui.active, 'ARAVELL · TOMERIN · VEYRA\nKARSK · BELOVAR · NAMARRA')
   assert.match(waiting.ui.roster, /0 \/ 6 SEATED · 6 ACTIVE/)
-  assert.match(waiting.ui.instruction, /Sit in the matching color seats/)
+  assert.match(
+    waiting.ui.instruction,
+    /Choose the active roster, sit in matching color seats, take only the active delegations' private cards, then enter dispatch and open the conference\./,
+  )
 
   const opened = await snapshot(
     bridge,
@@ -785,12 +788,12 @@ end
   assert.equal(reset.state.started, false)
   assert(isTrue(reset.ui.bodyActive))
   assert(isTrue(reset.ui.toolsActive), 'Overview and Status must remain available during setup.')
-  assert.equal(String(reset.ui.panelHeight), '492')
+  assert.equal(String(reset.ui.panelHeight), '504')
   assert.equal(reset.ui.collapseLabel, '−')
   assert.match(reset.ui.roster, /0 \/ 6 SEATED · 6 ACTIVE/)
   assert.equal(reset.refugee, 12, 'Cleanup must restore the six-player refugee counter.')
 
-  console.log('Live TTS verification passed: setup tools, persistence and authorization, chat/hotkeys, all 2–6-player rosters, deals, native turns, console controls, both endings/undo paths, chair rotation, overview, and collapse.')
+  console.log('Live TTS verification passed: setup tools, persistence and authorization, chat/hotkeys, all 2–6-player rosters, deals, native turns, console controls, signed-victory and Round-6 ending/undo paths, chair rotation, overview, and collapse.')
 } catch (error) {
   failure = error
   console.error(`Live TTS verification failed: ${error.message}`)

@@ -138,7 +138,7 @@ export const policies = [
     id: 'demobilize-brigade',
     title: 'Demobilize a brigade',
     kicker: 'De-escalation',
-    description: 'Move 1 Military back into civilian life and gain 1 Peace.',
+    description: 'Lose 1 Military, gain 1 Population, and gain 1 Peace.',
   },
   {
     id: 'strategic-levy',
@@ -150,7 +150,7 @@ export const policies = [
     id: 'relief-corridor',
     title: 'Relief corridor',
     kicker: 'Humanitarian',
-    description: 'Spend 1 Food and 1 Capital to resettle up to 2 Refugees. Gain 1 Peace.',
+    description: "Spend 1 Food and 1 Capital. Move up to 2 Refugees into this country's Population: reduce Refugees and gain equal Population. Gain 1 Peace.",
   },
   {
     id: 'public-reassurance',
@@ -162,13 +162,13 @@ export const policies = [
     id: 'state-visit',
     title: 'State visit',
     kicker: 'Diplomacy',
-    description: 'Spend 1 Capital. Build 2 Trust with one country and reveal its mandate.',
+    description: 'Spend 1 Capital. Choose another active country: build 2 Trust with it, reveal its mandate, and gain 1 Peace.',
   },
   {
     id: 'medical-mission',
     title: 'Medical mission',
     kicker: 'Diplomacy',
-    description: 'Spend 1 Food. Another country gains 1 Population; build 2 Trust.',
+    description: 'Spend 1 Food. Another active country gains 1 Population; build 2 Trust with that country and gain 1 Peace.',
   },
   {
     id: 'mutual-stand-down',

@@ -16,6 +16,8 @@ SEAT_COLORS = {
     namarra = "Teal",
 }
 PHASES = {"briefing", "cabinet", "crisis", "summit", "aftermath", "ended"}
+PANEL_HEIGHT_EXPANDED = "504"
+PANEL_HEIGHT_COLLAPSED = "70"
 PHASE_NAMES = {
     briefing = "Briefing",
     cabinet = "Cabinet",
@@ -32,7 +34,7 @@ INSTRUCTIONS = {
     aftermath = "Resolve the communiqué, clear proposals, and prepare the next round.",
     ended = "All countries signed, or Round 6 ended. Read the final communiqué.",
 }
-SETUP_INSTRUCTION = "Sit in the matching color seats. Choose the active roster and dispatch, then open the conference."
+SETUP_INSTRUCTION = "Choose the active roster, sit in matching color seats, take only the active delegations' private cards, then enter dispatch and open the conference."
 ADVANCE_LABELS = {
     briefing = "BEGIN CABINET",
     cabinet = "END CABINET TURN",
@@ -225,7 +227,7 @@ end
 function uiStartConference(player)
     if state.started then
         if player then
-            broadcastToColor("The conference is already underway. Reload this save to reset every physical component.", player.color, {0.93, 0.76, 0.36})
+            broadcastToColor("The conference is already underway. For a full reset, reload the untouched original save; this discards unsaved physical changes.", player.color, {0.93, 0.76, 0.36})
         end
         return
     end
@@ -381,7 +383,7 @@ end
 
 function advanceClock()
     if not state.started then
-        printToAll("[On War's End] Choose countries and a dispatch code, then Start conference.", {0.89, 0.76, 0.45})
+        printToAll("[On War's End] " .. SETUP_INSTRUCTION, {0.89, 0.76, 0.45})
         return
     end
     if state.phase == "ended" then return end
@@ -484,7 +486,7 @@ function updateUI()
         UI.setValue("activeText", "CHAIR  " .. COUNTRY_NAMES[chairCountry()] .. "    /    TABLE STEP")
     end
     UI.setValue("instructionText", currentInstruction())
-    UI.setAttribute("advanceButton", "text", state.started and ADVANCE_LABELS[state.phase] or "Start first")
+    UI.setAttribute("advanceButton", "text", state.started and ADVANCE_LABELS[state.phase] or "OPEN THE CONFERENCE")
     UI.setAttribute("playerCount", "value", state.playerCount - 2)
     UI.setAttribute("playerCount", "interactable", is_setup)
     UI.setValue("dispatchCode", tostring(state.dispatchCode))
@@ -517,7 +519,7 @@ end
 
 function applyPanelState()
     UI.setAttribute("clockBody", "active", not panelCollapsed)
-    UI.setAttribute("clockPanel", "height", panelCollapsed and "70" or "492")
+    UI.setAttribute("clockPanel", "height", panelCollapsed and PANEL_HEIGHT_COLLAPSED or PANEL_HEIGHT_EXPANDED)
     UI.setAttribute("collapseButton", "text", panelCollapsed and "+" or "−")
 end
 
@@ -677,7 +679,7 @@ function onChat(message, sender)
     if not message or string.sub(string.lower(message), 1, 4) ~= "!owe" then return true end
     local command = string.lower(message)
     if command == "!owe help" then
-        broadcastToColor("!owe status · !owe next · !owe back · !owe finish · !owe view. Host/promoted players control the clock; reload the save to reset the physical table.", sender.color, {0.89, 0.76, 0.45})
+        broadcastToColor("!owe status · !owe next · !owe back · !owe finish · !owe view. Host/promoted players control the clock; for a full reset, reload the untouched original save; this discards unsaved physical changes.", sender.color, {0.89, 0.76, 0.45})
     elseif command == "!owe status" then
         broadcastStatus(sender.color)
     elseif command == "!owe next" then
