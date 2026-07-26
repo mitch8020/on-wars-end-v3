@@ -71,10 +71,10 @@ The asset references are native absolute Windows paths. They work for single-pla
 
 1. Sit in the country color shown on each mat. The docket reports how many active delegations are seated.
 2. In the floating panel, choose 2–6 countries and enter a dispatch code. The active country names update immediately.
-3. Select **Start conference**.
+3. Select **Open the conference**.
 4. Reveal the top Crisis card and select **Begin Cabinet**.
-5. Use **NEXT** after the active delegation completes its move.
-6. Use **BACK** only to repair the clock. It does not undo pieces already moved.
+5. Use the docket's phase-specific action, the physical console, or TTS **End Turn** after the active delegation completes its move.
+6. Use **Undo clock** only to repair the clock. It does not undo pieces already moved.
 7. When every active delegation has moved its signature seal, use the guarded **ALL SIGNED** action twice to close the conference immediately.
 
 The conference docket can be collapsed from its upper-right control. Its numbered rail shows the current table step without replacing the physical phase marker. A spectator host is framed automatically after setup finishes loading; use **OVERVIEW** (or `!owe view`) to restore the same tested full-table framing later.
@@ -106,4 +106,4 @@ With the generated save open in Tabletop Simulator:
 npm run tts:test:live
 ```
 
-The live test loads the generated Global/controller scripts into the open table through TTS's local external editor API. It verifies every 2–6-country roster, deterministic chairs and counters, active/inactive private deals, native End Turn events, physical-console bridges, full phase cadence, both conference endings and their undo paths, chair rotation, Overview, and panel collapse. It restores the open session—including physical counters and decks—to setup when complete.
+The live test loads the generated Global/controller scripts into the open table through TTS's local external editor API. It verifies the floating-panel start, save persistence, host authorization, chat/hotkey entry points, every 2–6-country roster, deterministic chairs and counters, active/inactive private deals, native End Turn events, physical-console bridges, full phase cadence, both conference endings and their undo paths, chair rotation, Overview, and panel collapse. It restores the open session—including physical counters, decks, and camera framing—to setup when complete.

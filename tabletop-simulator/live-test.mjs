@@ -364,7 +364,11 @@ updateAll()
   assert.match(waiting.ui.roster, /0 \/ 6 SEATED · 6 ACTIVE/)
   assert.match(waiting.ui.instruction, /Sit in the matching color seats/)
 
-  const opened = await snapshot(bridge, 'conference start, deterministic chair, and counter reset', 'startConference()')
+  const opened = await snapshot(
+    bridge,
+    'floating-panel start, deterministic chair, and counter reset',
+    'uiStartConference(Player["White"])',
+  )
   assert.equal(opened.state.started, true)
   assert.equal(opened.state.phase, 'briefing')
   assert.equal(opened.state.chairIndex, expectedChair(148802, 6))
@@ -373,12 +377,32 @@ updateAll()
   assert.match(opened.ui.active, /TABLE STEP/)
   assert(isFalse(opened.ui.finishActive), 'All-signed control must not appear during Briefing.')
 
+  const controlBoundary = await snapshot(
+    bridge,
+    'save payload and chat authorization preserve the active conference',
+    `
+local unpromotedPlayer = {color = "White", host = false, promoted = false}
+local ordinaryChatResult = onChat("ordinary table talk", unpromotedPlayer)
+local deniedChatResult = onChat("!owe next", unpromotedPlayer)
+local persisted = JSON.decode(onSave())
+assert(ordinaryChatResult == true, "ordinary chat must pass through")
+assert(deniedChatResult == false, "recognized commands must stay out of public chat")
+assert(state.phase == "briefing", "an unpromoted seat advanced the conference")
+assert(persisted.started == true, "started state was not persisted")
+assert(persisted.playerCount == 6, "active roster was not persisted")
+assert(persisted.dispatchCode == 148802, "dispatch code was not persisted")
+assert(persisted.chairIndex == state.chairIndex, "chair was not persisted")
+`,
+  )
+  assert.equal(controlBoundary.state.phase, 'briefing')
+  assert.equal(controlBoundary.state.chairIndex, opened.state.chairIndex)
+
   const cabinet = await snapshot(
     bridge,
-    'Cabinet opening, built-in turns, and six private deals',
+    'hotkey Cabinet opening, built-in turns, and six private deals',
     `
+hotkeyNext("White")
 if Player["White"].seated then Player["White"].changeColor(SEAT_COLORS[chairCountry()]) end
-advanceClock()
 `,
     2.5,
   )
@@ -447,8 +471,16 @@ advanceClock()
 
   const overview = await snapshot(
     bridge,
-    'per-player Overview frames the table without changing clock state',
-    'uiOverview(Player[SEAT_COLORS[chairCountry()]])',
+    'chat Status and Overview commands preserve the clock state',
+    `
+local hostPlayer = nil
+for _, player in ipairs(Player.getPlayers()) do
+    if player.host then hostPlayer = player end
+end
+assert(hostPlayer ~= nil, "host player was not available for chat checks")
+onChat("!owe status", hostPlayer)
+onChat("!owe view", hostPlayer)
+`,
   )
   assert.equal(overview.state.round, 2)
   assert.equal(overview.state.phase, 'briefing')
@@ -699,7 +731,7 @@ end, 0.5)
   assert.match(reset.ui.roster, /0 \/ 6 SEATED · 6 ACTIVE/)
   assert.equal(reset.refugee, 12, 'Cleanup must restore the six-player refugee counter.')
 
-  console.log('Live TTS verification passed: setup tools, all 2–6-player rosters, deals, native turns, console controls, both endings/undo paths, chair rotation, overview, and collapse.')
+  console.log('Live TTS verification passed: setup tools, persistence and authorization, chat/hotkeys, all 2–6-player rosters, deals, native turns, console controls, both endings/undo paths, chair rotation, overview, and collapse.')
 } catch (error) {
   failure = error
   console.error(`Live TTS verification failed: ${error.message}`)
