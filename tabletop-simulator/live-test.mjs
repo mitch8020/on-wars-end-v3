@@ -49,7 +49,13 @@ class TtsBridge {
 
   async request(payload, predicate, timeoutMs = 20_000) {
     const response = this.waitFor(predicate, timeoutMs)
-    await this.send(payload)
+    response.catch(() => {})
+    try {
+      await this.send(payload)
+    } catch (error) {
+      this.cancelWait(response, error)
+      throw error
+    }
     return response
   }
 
@@ -68,8 +74,9 @@ class TtsBridge {
     if (existingIndex >= 0) {
       return Promise.resolve(this.messages.splice(existingIndex, 1)[0])
     }
-    return new Promise((resolve, reject) => {
-      const waiter = {
+    let waiter
+    const promise = new Promise((resolve, reject) => {
+      waiter = {
         predicate,
         resolve,
         reject,
@@ -78,8 +85,18 @@ class TtsBridge {
           reject(new Error(`Timed out after ${timeoutMs}ms waiting for Tabletop Simulator.`))
         }, timeoutMs),
       }
-      this.waiters.push(waiter)
     })
+    waiter.promise = promise
+    this.waiters.push(waiter)
+    return promise
+  }
+
+  cancelWait(promise, error) {
+    const waiterIndex = this.waiters.findIndex((candidate) => candidate.promise === promise)
+    if (waiterIndex < 0) return
+    const [waiter] = this.waiters.splice(waiterIndex, 1)
+    clearTimeout(waiter.timer)
+    waiter.reject(error)
   }
 
   #accept(message) {

@@ -22,6 +22,14 @@ const guids = recursive.map((object) => object.GUID)
 const uniqueGuids = new Set(guids)
 const usedTags = new Set(recursive.flatMap((object) => object.Tags ?? []))
 const declaredTags = new Set((save.ComponentTags?.labels ?? []).map((tag) => tag.displayed))
+const ttsSeatColors = {
+  Blue: { r: 0.117999978, g: 0.53, b: 1, a: 0 },
+  Red: { r: 0.856, g: 0.09999997, b: 0.09399996, a: 0 },
+  Green: { r: 0.191999972, g: 0.701, b: 0.167999953, a: 0 },
+  Yellow: { r: 0.905, g: 0.898, b: 0.171999961, a: 0 },
+  Purple: { r: 0.627, g: 0.124999978, b: 0.941, a: 0 },
+  Teal: { r: 0.128999949, g: 0.694, b: 0.606999934, a: 0 },
+}
 
 assert(save.SaveName === "On War's End v3 — The Vellan Accord", 'Unexpected save name.')
 assert(save.VersionNumber === 'v13.3', 'Unexpected TTS save version.')
@@ -53,6 +61,16 @@ const topWithTag = (tag) => topLevel.filter((object) => object.Tags?.includes(ta
 
 assert(topWithTag('CountryMat').length === countries.length, 'Expected six country mats.')
 assert(topWithTag('PolicyDeck').length === countries.length, 'Expected six Cabinet policy decks.')
+assert(
+  countries.every((country) => {
+    const hand = topWithTag(`Country_${country.id}`).find((object) => object.Name === 'HandTrigger')
+    return (
+      hand?.FogColor === country.seatColor &&
+      JSON.stringify(hand?.ColorDiffuse) === JSON.stringify(ttsSeatColors[country.seatColor])
+    )
+  }),
+  'Every private hand zone must use its exact TTS seat color and remain transparent.',
+)
 assert(withTag('PolicyCard').length === policies.length * countries.length, 'Expected 96 contained policy cards.')
 assert(withTag('CrisisCard').length === crises.length + 1, 'Expected six crisis cards plus the tagged crisis deck.')
 assert(withTag('MandateCard').length === countries.length, 'Expected six private mandate cards.')

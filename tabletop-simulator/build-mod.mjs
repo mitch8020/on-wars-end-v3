@@ -13,6 +13,14 @@ const projectRoot = path.dirname(here)
 const assetDir = path.join(here, 'assets')
 const distDir = path.join(here, 'dist')
 const sourceDir = path.join(here, 'src')
+const ttsSeatColors = {
+  Blue: { r: 0.117999978, g: 0.53, b: 1, a: 0 },
+  Red: { r: 0.856, g: 0.09999997, b: 0.09399996, a: 0 },
+  Green: { r: 0.191999972, g: 0.701, b: 0.167999953, a: 0 },
+  Yellow: { r: 0.905, g: 0.898, b: 0.171999961, a: 0 },
+  Purple: { r: 0.627, g: 0.124999978, b: 0.941, a: 0 },
+  Teal: { r: 0.128999949, g: 0.694, b: 0.606999934, a: 0 },
+}
 
 await mkdir(assetDir, { recursive: true })
 await mkdir(distDir, { recursive: true })
@@ -947,11 +955,10 @@ for (const country of countries) {
     position: handPosition,
     rotation: { y: country.position.rotation },
     scale: { x: 8.2, y: 5, z: 2.3 },
-    color: country.color,
     locked: true,
     tags: ['HandZone', `Country_${country.id}`],
   })
-  hand.ColorDiffuse.a = 0
+  hand.ColorDiffuse = { ...ttsSeatColors[country.seatColor] }
   hand.FogColor = country.seatColor
   objectStates.push(hand)
 }
