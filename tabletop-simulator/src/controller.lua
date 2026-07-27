@@ -56,6 +56,11 @@ function setStatus(data)
     if not data then return end
     self.editButton({index = 0, label = data.label or "CONFERENCE CLOCK"})
     self.editButton({index = 1, label = data.advance or "NEXT"})
+    self.editButton({
+        index = 2,
+        label = data.back or "BACK",
+        tooltip = data.backTooltip or "Step the clock back once. This does not undo moved pieces.",
+    })
 end
 
 function advance(_, color)
